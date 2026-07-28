@@ -1,5 +1,6 @@
 ﻿from app.api.schemas import ProjectOut, SourceOut, SourceStatusLabel, SourceTypeLabel
 from app.db import prisma
+from app.services.queue import enqueue_ingestion_for_source
 
 
 async def list_projects() -> list[ProjectOut]:
@@ -43,6 +44,10 @@ async def create_source_for_project(slug: str, payload) -> SourceOut:
             "last_synced_at": None,
         }
     )
+
+    if normalized_type == "URL":
+        await enqueue_ingestion_for_source(source.id)
+
     return map_source(source)
 
 

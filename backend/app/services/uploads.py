@@ -8,6 +8,7 @@ from app.api.schemas import SourceUploadCreateInput, SourceOut, UploadCreateOut
 from app.core.config import get_settings
 from app.db import prisma
 from app.services.projects import map_source
+from app.services.queue import enqueue_ingestion_for_source
 
 settings = get_settings()
 
@@ -76,6 +77,9 @@ async def create_upload_for_project(payload: SourceUploadCreateInput) -> UploadC
         r2_object_key = build_r2_object_key(project.slug, source.id, payload.file_name)
         upload_url = generate_presigned_upload_url(r2_object_key)
 
+    if normalized_type == "URL":
+        await enqueue_ingestion_for_source(source.id)
+
     return UploadCreateOut(
         source=map_source(source),
         uploadUrl=upload_url,
@@ -109,4 +113,5 @@ async def finalize_uploaded_source(source_id: str) -> SourceOut:
         where={"id": source_id},
         data={"size_bytes": size_bytes, "status": "QUEUED"},
     )
+    await enqueue_ingestion_for_source(source_id)
     return map_source(updated_source)

@@ -11,12 +11,15 @@ dependencies = [
   "python-dotenv>=1.1.1",
   "prisma",
   "boto3>=1.28.0",
+  "aio-pika>=11.0.0",
+  "httpx>=0.28.1",
+  "pypdf>=3.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.4.0",
-  "httpx>=0.28.1",
+  "pytest-asyncio>=0.22.0",
   "ruff>=0.12.0",
 ]
 

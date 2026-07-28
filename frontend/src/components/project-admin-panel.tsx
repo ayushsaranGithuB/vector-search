@@ -72,7 +72,8 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       notes,
     };
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
     const response = await fetch(`${backendUrl}/uploads`, {
       method: "POST",
       headers: {
@@ -99,6 +100,18 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
 
       if (!uploadResponse.ok) {
         setStatusMessage("Failed to upload PDF to Cloudflare R2.");
+        return;
+      }
+
+      const finalizeResponse = await fetch(
+        `${backendUrl}/uploads/${result.source.id}/finalize`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!finalizeResponse.ok) {
+        setStatusMessage("Failed to finalize the uploaded PDF.");
         return;
       }
     }
