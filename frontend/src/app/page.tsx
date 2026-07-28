@@ -9,36 +9,45 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+// Icons
+import { BarChart3, Eye, Form, Layers, Route, Search } from "lucide-react";
+
 const coreCapabilities = [
   {
     title: "Grounded Answers",
     description:
       "Answers backed by source citations with highlighted retrieved text.",
+    lucideIcon: <Route size={18} />,
   },
   {
     title: "Hybrid Search",
     description:
       "Keyword, vector, and hybrid retrieval combined for the best results.",
+    lucideIcon: <Search size={18} />,
   },
   {
     title: "Full Observability",
     description:
       "Cosine similarity scores, rerank scores, and latency for each pipeline stage.",
+    lucideIcon: <BarChart3 size={18} />,
   },
   {
     title: "Citation Inspection",
     description:
       "Flag unsupported claims when an answer is not backed by citations.",
+    lucideIcon: <Eye size={18} />,
   },
   {
     title: "Embedding Visualisation",
     description:
       "Visualise embeddings with UMAP or t-SNE to understand your data.",
+    lucideIcon: <Layers size={18} />,
   },
   {
     title: "Multi-Project SaaS",
     description:
       "Each project is a separate searchable workspace with its own sources and settings.",
+    lucideIcon: <Form size={18} />,
   },
 ];
 
@@ -119,24 +128,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-4xl font-bold tracking-tight">
-            Project Database
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Browse projects sourced directly from the connected Neon database.
-          </p>
-        </div>
-        <div className="mt-16 flex justify-center">
-          <Link href="/projects">
-            <Button size="lg" className="text-lg px-8 py-6 h-auto">
-              Browse Projects
-            </Button>
-          </Link>
-        </div>
-      </section>
-
       {/* Core Capabilities */}
       <section className="border-t border-border bg-muted/30">
         <div className="mx-auto max-w-6xl px-6 py-24 sm:py-32 lg:px-8">
@@ -153,13 +144,18 @@ export default function Home() {
             {coreCapabilities.map((capability) => (
               <Card
                 key={capability.title}
-                className="border-border/50 transition-colors hover:border-border"
+                className="border-border/50 transition-colors hover:border-border px-3 py-6"
               >
                 <CardHeader>
-                  <CardTitle className="text-xl">{capability.title}</CardTitle>
+                  <CardTitle className="text-xl flex gap-2 items-center">
+                    {capability.lucideIcon && (
+                      <span className="text-sm">{capability.lucideIcon}</span>
+                    )}
+                    {capability.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-base leading-relaxed">
+                  <CardDescription className="text-sm leading-relaxed">
                     {capability.description}
                   </CardDescription>
                 </CardContent>
@@ -202,31 +198,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p className="text-sm text-muted-foreground">
-              Vector Search SaaS - Built with Next.js, FastAPI, and shadcn/ui
-            </p>
-            <div className="flex gap-6">
-              <Link
-                href="/docs"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Docs
-              </Link>
-              <Link
-                href="/projects"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Projects
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
     </>
   );
 }

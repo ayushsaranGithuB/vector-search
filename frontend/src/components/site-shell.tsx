@@ -4,16 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BowArrow } from "lucide-react";
 
 const navLinks = [
   { href: "/", label: "Home" },
-  { href: "/projects", label: "Projects" },
+  { href: "/docs", label: "Docs" },
   { href: "/admin", label: "Admin" },
 ];
 
 const footerLinks = [
   { href: "/", label: "Home" },
-  { href: "/projects", label: "Projects" },
+  { href: "/docs", label: "Docs" },
   { href: "/admin", label: "Admin" },
 ];
 
@@ -28,6 +29,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             href="/"
             className="text-lg font-semibold tracking-tight transition hover:text-primary"
           >
+            <BowArrow className="inline-block mr-2 h-5 w-5" />
             Vector Search
           </Link>
 
@@ -105,8 +107,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-border bg-muted/50 text-sm text-muted-foreground">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="space-y-2">
-            <p className="font-semibold">Vector Search SaaS</p>
-            <p className="max-w-xl leading-6">
+            <Link
+              href="/"
+              className="text-lg font-semibold tracking-tight transition hover:text-primary"
+            >
+              <BowArrow className="inline-block mr-2 h-5 w-5" />
+              Vector Search
+            </Link>
+            <p className="max-w-sm leading-5 pt-2 text-xs text-neutral-400 ">
               A lightweight platform for searching and exploring domain-specific
               knowledge with citations and observability.
             </p>
