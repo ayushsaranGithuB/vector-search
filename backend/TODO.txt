@@ -1,6 +1,6 @@
 # Next Up
 
-- [ ] LLM-powered grounded answers (generate natural language answers from retrieved chunks)
+- [x] LLM-powered grounded answers (generate natural language answers from retrieved chunks)
 - [ ] Reranking pipeline for improved result quality
 - [ ] Query analytics and observability dashboard
 - [ ] Populate `pinecone_vector_id` on chunks after upsert

@@ -1,4 +1,4 @@
-﻿from app.api.schemas import ProjectOut, SourceOut, SourceStatusLabel, SourceTypeLabel
+﻿from app.api.schemas import ComparisonSummaryOut, ProjectOut, SearchSummaryOut, SourceOut, SourceStatusLabel, SourceTypeLabel
 from app.db import prisma
 from app.services.pinecone import pinecone_available, query_vectors
 from app.services.queue import enqueue_ingestion_for_source
@@ -174,3 +174,152 @@ def format_bytes(size_bytes: int | None) -> str:
 
 def enum_value(value: object) -> str:
     return getattr(value, "value", str(value))
+
+
+async def _fetch_search_results(project, query: str) -> list[dict]:
+    """Shared helper: fetch and format search results for a project + query."""
+    from app.services.pinecone import pinecone_available, query_vectors
+
+    chunks: list = []
+    if query and pinecone_available():
+        try:
+            matches = await query_vectors(query, namespace=project.slug)
+            chunk_ids = [chunk_id for chunk_id, score in matches]
+            if chunk_ids:
+                found_chunks = await prisma.chunk.find_many(
+                    where={"id": {"in": chunk_ids}},
+                )
+                chunk_map = {chunk.id: chunk for chunk in found_chunks}
+                ordered = [chunk_map[chunk_id] for chunk_id in chunk_ids if chunk_id in chunk_map]
+                chunks = ordered
+        except Exception:
+            chunks = []
+
+    if not chunks:
+        chunks = await prisma.chunk.find_many(
+            where={
+                "source": {"project_id": project.id},
+                "content": {"contains": query, "mode": "insensitive"},
+            },
+            order={"updated_at": "desc"},
+            take=10,
+        )
+
+    results = []
+    for chunk in chunks:
+        source = await prisma.source.find_unique(where={"id": chunk.source_id})
+        source_name = source.name if source is not None else "Unknown source"
+        excerpt = chunk.content
+        if query:
+            lower_query = query.lower()
+            lower_content = chunk.content.lower()
+            position = lower_content.find(lower_query)
+            if position != -1:
+                start = max(0, position - 100)
+                end = min(len(chunk.content), position + 100)
+                excerpt = f"...{chunk.content[start:end].strip()}..."
+
+        results.append({
+            "id": chunk.id,
+            "title": source_name,
+            "excerpt": excerpt,
+            "source": source_name,
+            "score": 1.0,
+            "citation": f"chunk {chunk.chunk_index}",
+        })
+
+    return results
+
+
+async def summarize_search_results(
+    slug: str,
+    query: str,
+    model_slug: str | None = None,
+) -> SearchSummaryOut:
+    """Search for results and generate an LLM-grounded summary with citations."""
+    from app.services.llm import MODEL_REGISTRY, generate_summary
+
+    project = await prisma.project.find_unique(where={"slug": slug})
+    if project is None:
+        raise ValueError("Project not found")
+
+    if not query.strip():
+        raise ValueError("Query is required")
+
+    results = await _fetch_search_results(project, query)
+
+    if not results:
+        raise ValueError("No results found to summarize")
+
+    # Resolve which model to use
+    effective_slug = model_slug if model_slug in MODEL_REGISTRY else next(iter(MODEL_REGISTRY))
+    model_info = MODEL_REGISTRY[effective_slug]
+
+    summary = await generate_summary(query, results, model_slug=effective_slug)
+    if summary is None:
+        raise ValueError("Failed to generate summary — check that OPENROUTER_API_KEY is configured")
+
+    return SearchSummaryOut(
+        summary=summary,
+        generated_from=len(results),
+        model_slug=effective_slug,
+        model_label=model_info["label"],
+    )
+
+
+async def compare_search_summaries(
+    slug: str,
+    query: str,
+    model_a_slug: str,
+    model_b_slug: str,
+) -> ComparisonSummaryOut:
+    """Generate summaries from two models for side-by-side comparison."""
+    from app.services.llm import MODEL_REGISTRY, generate_summary
+
+    project = await prisma.project.find_unique(where={"slug": slug})
+    if project is None:
+        raise ValueError("Project not found")
+
+    if not query.strip():
+        raise ValueError("Query is required")
+
+    if model_a_slug not in MODEL_REGISTRY:
+        raise ValueError(f"Unknown model_a: {model_a_slug}")
+    if model_b_slug not in MODEL_REGISTRY:
+        raise ValueError(f"Unknown model_b: {model_b_slug}")
+
+    results = await _fetch_search_results(project, query)
+    if not results:
+        raise ValueError("No results found to summarize")
+
+    model_a_info = MODEL_REGISTRY[model_a_slug]
+    model_b_info = MODEL_REGISTRY[model_b_slug]
+
+    # Run both models in parallel
+    import asyncio
+
+    summary_a_task = generate_summary(query, results, model_slug=model_a_slug)
+    summary_b_task = generate_summary(query, results, model_slug=model_b_slug)
+    summaries = await asyncio.gather(summary_a_task, summary_b_task)
+
+    summary_a, summary_b = summaries
+
+    if summary_a is None:
+        raise ValueError(f"Failed to generate summary with model '{model_a_info['label']}'")
+    if summary_b is None:
+        raise ValueError(f"Failed to generate summary with model '{model_b_info['label']}'")
+
+    return ComparisonSummaryOut(
+        model_a=SearchSummaryOut(
+            summary=summary_a,
+            generated_from=len(results),
+            model_slug=model_a_slug,
+            model_label=model_a_info["label"],
+        ),
+        model_b=SearchSummaryOut(
+            summary=summary_b,
+            generated_from=len(results),
+            model_slug=model_b_slug,
+            model_label=model_b_info["label"],
+        ),
+    )

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     pinecone_cloud: str = Field(default="aws", alias="PINECONE_CLOUD")
     pinecone_region: str = Field(default="us-east-1", alias="PINECONE_REGION")
     pinecone_environment: str | None = Field(default=None, alias="PINECONE_ENVIRONMENT")
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
     cloudamqp_url: str = Field(default="", alias="CLOUDAMQP_URL")
     r2_access_key_id: str = Field(default="", alias="R2_ACCESS_KEY_ID")
     r2_secret_access_key: str = Field(default="", alias="R2_SECRET_ACCESS_KEY")

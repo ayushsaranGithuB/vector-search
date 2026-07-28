@@ -14,6 +14,25 @@ class SearchResultOut(BaseModel):
     citation: str
 
 
+class SearchSummaryOut(BaseModel):
+    summary: str
+    generated_from: int  # number of results used to generate the summary
+    model_slug: str = ""  # which model generated this summary
+    model_label: str = ""  # human-readable model name
+
+
+class ModelInfo(BaseModel):
+    slug: str
+    label: str
+
+
+class ComparisonSummaryOut(BaseModel):
+    """Two summaries side-by-side for comparison."""
+
+    model_a: SearchSummaryOut
+    model_b: SearchSummaryOut
+
+
 class SourceCreateInput(BaseModel):
     name: str
     type: SourceTypeLabel

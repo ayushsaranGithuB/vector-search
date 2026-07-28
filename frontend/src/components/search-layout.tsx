@@ -20,6 +20,18 @@ interface SearchResult {
   citation: string;
 }
 
+interface SearchSummary {
+  summary: string;
+  generated_from: number;
+  model_slug: string;
+  model_label: string;
+}
+
+interface ComparisonSummary {
+  model_a: SearchSummary;
+  model_b: SearchSummary;
+}
+
 interface SearchLayoutProps {
   projectSlug: string;
   projectName: string;
@@ -38,6 +50,43 @@ export function SearchLayout({
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [summary, setSummary] = useState<ComparisonSummary | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+
+  /** Highlight matching terms in text */
+  function highlightMatches(
+    text: string,
+    searchQuery: string,
+  ): React.ReactNode {
+    if (!searchQuery.trim()) return text;
+
+    const terms = searchQuery
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t.length > 0)
+      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
+    if (terms.length === 0) return text;
+
+    const pattern = `(${terms.join("|")})`;
+    const regex = new RegExp(pattern, "gi");
+    const parts = text.split(regex);
+
+    return parts.map((part, i) => {
+      if (!part) return null;
+      const isMatch = new RegExp(`^${pattern}$`, "i").test(part);
+      return isMatch ? (
+        <mark
+          key={i}
+          className="rounded-sm bg-yellow-200 px-0.5 text-inherit dark:bg-yellow-700/60"
+        >
+          {part}
+        </mark>
+      ) : (
+        part
+      );
+    });
+  }
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -61,6 +110,37 @@ export function SearchLayout({
     const data = await response.json();
     setResults(data);
     setIsSearching(false);
+    // Reset summary when a new search happens
+    setSummary(null);
+  }
+
+  async function handleGenerateSummary() {
+    if (!query.trim() || results.length === 0) return;
+
+    setIsSummarizing(true);
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/projects/${encodeURIComponent(
+          projectSlug,
+        )}/search/summary/compare?q=${encodeURIComponent(
+          query,
+        )}&model_a=qwen-3-8b&model_b=gemini-flash-lite`,
+      );
+
+      if (!response.ok) {
+        console.error("Summary generation failed:", response.statusText);
+        setIsSummarizing(false);
+        return;
+      }
+
+      const data: ComparisonSummary = await response.json();
+      setSummary(data);
+    } catch (err) {
+      console.error("Summary generation error:", err);
+    } finally {
+      setIsSummarizing(false);
+    }
   }
 
   return (
@@ -133,19 +213,190 @@ export function SearchLayout({
       )}
 
       {!isSearching && results.length > 0 && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Found {results.length} result{results.length !== 1 ? "s" : ""}
-          </p>
-          {results.map((result) => (
+        <div className="space-y-6">
+          {/* Result Count & Summary Button */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Found {results.length} result{results.length !== 1 ? "s" : ""}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSummarizing}
+              onClick={handleGenerateSummary}
+            >
+              {isSummarizing ? (
+                <>
+                  <svg
+                    className="mr-2 h-4 w-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Summarizing...
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="mr-2 h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"
+                    />
+                  </svg>
+                  Generate AI Summary
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* AI Summary Comparison — side-by-side models */}
+          {summary && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-5 w-5 text-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"
+                  />
+                </svg>
+                <h2 className="text-lg font-semibold">AI Summary Comparison</h2>
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {summary.model_a.generated_from} results &middot; 2 models
+                </Badge>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {/* Model A */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      {summary.model_a.model_label}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {summary.model_a.model_slug}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="prose prose-sm max-w-none text-muted-foreground [&_p]:mb-3 [&_p:last-child]:mb-0">
+                      {summary.model_a.summary
+                        .split("\n\n")
+                        .map((paragraph, i) => {
+                          const withCitations = paragraph.replace(
+                            /\[(\d+)\]/g,
+                            (match, num) => {
+                              const idx = parseInt(num, 10) - 1;
+                              if (idx >= 0 && idx < results.length) {
+                                return (
+                                  `<a href="#result-${results[idx].id}" class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
+                                  match +
+                                  "</a>"
+                                );
+                              }
+                              return match;
+                            },
+                          );
+                          return (
+                            <p
+                              key={i}
+                              dangerouslySetInnerHTML={{
+                                __html: withCitations,
+                              }}
+                            />
+                          );
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Model B */}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      {summary.model_b.model_label}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {summary.model_b.model_slug}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="prose prose-sm max-w-none text-muted-foreground [&_p]:mb-3 [&_p:last-child]:mb-0">
+                      {summary.model_b.summary
+                        .split("\n\n")
+                        .map((paragraph, i) => {
+                          const withCitations = paragraph.replace(
+                            /\[(\d+)\]/g,
+                            (match, num) => {
+                              const idx = parseInt(num, 10) - 1;
+                              if (idx >= 0 && idx < results.length) {
+                                return (
+                                  `<a href="#result-${results[idx].id}" class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
+                                  match +
+                                  "</a>"
+                                );
+                              }
+                              return match;
+                            },
+                          );
+                          return (
+                            <p
+                              key={i}
+                              dangerouslySetInnerHTML={{
+                                __html: withCitations,
+                              }}
+                            />
+                          );
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Result Cards */}
+          {results.map((result, index) => (
             <Card
               key={result.id}
+              id={`result-${result.id}`}
               className="border-border/50 transition-colors hover:border-border"
             >
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <CardTitle className="text-base">{result.title}</CardTitle>
+                    <CardTitle className="text-base">
+                      <span className="text-xs font-normal text-muted-foreground mr-1">
+                        [{index + 1}]
+                      </span>
+                      {highlightMatches(result.title, query)}
+                    </CardTitle>
                     <CardDescription className="mt-1">
                       Source: {result.source} &middot; Citation:{" "}
                       {result.citation}
@@ -158,7 +409,7 @@ export function SearchLayout({
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  {result.excerpt}
+                  {highlightMatches(result.excerpt, query)}
                 </p>
               </CardContent>
             </Card>
