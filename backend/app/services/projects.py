@@ -96,12 +96,26 @@ async def list_project_search_results(slug: str, query: str) -> list[dict]:
                 end = min(len(chunk.content), position + 100)
                 excerpt = f"...{chunk.content[start:end].strip()}..."
 
+        # Build source URL
+        from app.core.config import get_settings
+        from app.services.uploads import build_r2_object_key
+
+        settings = get_settings()
+        source_url: str | None = None
+        if source is not None:
+            if source.source_type == "URL":
+                source_url = source.source_url
+            elif source.source_type == "PDF" and source.file_name and settings.r2_public_url:
+                object_key = build_r2_object_key(slug, source.id, source.file_name)
+                source_url = f"{settings.r2_public_url}/{object_key}"
+
         results.append(
             {
                 "id": chunk.id,
                 "title": source_name,
                 "excerpt": excerpt,
                 "source": source_name,
+                "source_url": source_url,
                 "score": 1.0,
                 "citation": f"chunk {chunk.chunk_index}",
             }
@@ -178,7 +192,11 @@ def enum_value(value: object) -> str:
 
 async def _fetch_search_results(project, query: str) -> list[dict]:
     """Shared helper: fetch and format search results for a project + query."""
+    from app.core.config import get_settings
     from app.services.pinecone import pinecone_available, query_vectors
+    from app.services.uploads import build_r2_object_key
+
+    settings = get_settings()
 
     chunks: list = []
     if query and pinecone_available():
@@ -219,11 +237,21 @@ async def _fetch_search_results(project, query: str) -> list[dict]:
                 end = min(len(chunk.content), position + 100)
                 excerpt = f"...{chunk.content[start:end].strip()}..."
 
+        # Build source URL
+        source_url: str | None = None
+        if source is not None:
+            if source.source_type == "URL":
+                source_url = source.source_url
+            elif source.source_type == "PDF" and source.file_name and settings.r2_public_url:
+                object_key = build_r2_object_key(project.slug, source.id, source.file_name)
+                source_url = f"{settings.r2_public_url}/{object_key}"
+
         results.append({
             "id": chunk.id,
             "title": source_name,
             "excerpt": excerpt,
             "source": source_name,
+            "source_url": source_url,
             "score": 1.0,
             "citation": f"chunk {chunk.chunk_index}",
         })

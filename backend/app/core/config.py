@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     r2_account_id: str = Field(default="", alias="R2_ACCOUNT_ID")
     r2_endpoint: str | None = Field(default=None, alias="R2_ENDPOINT")
     s3_api_endpoint: str | None = Field(default=None, alias="S3_API_ENDPOINT")
+    r2_public_url: str = Field(default="", alias="R2_PUBLIC_URL")
 
     @property
     def r2_base_endpoint(self) -> str:

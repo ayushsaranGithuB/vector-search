@@ -53,7 +53,7 @@ SYSTEM_PROMPT = """You are a precise research assistant. Your job is to answer t
 
 Rules:
 1. Answer in clear, well-structured paragraphs.
-2. Use numbered citations like [1], [2], etc. to cite the source of each fact.
+2. Use numbered citations like [1], [2], etc. to cite the source of each fact. Always mention the source name alongside the citation number — for example: "According to [1] Motor Vehicles Rules..." rather than just "[1]".
 3. Each citation number corresponds to the numbered result list provided below.
 4. If the snippets don't contain enough information to answer, say so — do not make up facts.
 5. Always ground every factual claim in at least one citation.
@@ -68,9 +68,11 @@ def build_context(results: list[dict[str, Any]]) -> str:
         excerpt = result.get("excerpt", "")
         source = result.get("source", "Unknown")
         citation = result.get("citation", "")
+        source_url = result.get("source_url") or ""
         parts.append(
             f"[{i}] Title: {title}\n"
             f"    Source: {source} ({citation})\n"
+            f"    URL: {source_url}\n"
             f"    Content: {excerpt}\n"
         )
     return "\n---\n".join(parts)
@@ -89,6 +91,7 @@ def _build_messages(query: str, context: str) -> list[dict[str, str]]:
 
 Write a concise, well-structured answer to the user's question using only the information above.
 Use numbered citations like [1], [2] to reference the search result each fact comes from.
+Always mention the source name right after the citation number — for example: "According to [1] Motor Vehicles Rules...".
 Group related facts into paragraphs. Do not use bullet points unless necessary."""
     return [
         {"role": "system", "content": SYSTEM_PROMPT},

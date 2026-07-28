@@ -16,6 +16,7 @@ interface SearchResult {
   title: string;
   excerpt: string;
   source: string;
+  source_url: string | null;
   score: number;
   citation: string;
 }
@@ -314,10 +315,16 @@ export function SearchLayout({
                             (match, num) => {
                               const idx = parseInt(num, 10) - 1;
                               if (idx >= 0 && idx < results.length) {
+                                const r = results[idx];
+                                const href = r.source_url ?? `#result-${r.id}`;
+                                const target = r.source_url ? "_blank" : "";
+                                const rel = r.source_url
+                                  ? "noopener noreferrer"
+                                  : "";
                                 return (
-                                  `<a href="#result-${results[idx].id}" class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
+                                  `<a href="${href}" target="${target}" rel="${rel}" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
                                   match +
-                                  "</a>"
+                                  ` ${r.source}</a>`
                                 );
                               }
                               return match;
@@ -356,10 +363,16 @@ export function SearchLayout({
                             (match, num) => {
                               const idx = parseInt(num, 10) - 1;
                               if (idx >= 0 && idx < results.length) {
+                                const r = results[idx];
+                                const href = r.source_url ?? `#result-${r.id}`;
+                                const target = r.source_url ? "_blank" : "";
+                                const rel = r.source_url
+                                  ? "noopener noreferrer"
+                                  : "";
                                 return (
-                                  `<a href="#result-${results[idx].id}" class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
+                                  `<a href="${href}" target="${target}" rel="${rel}" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
                                   match +
-                                  "</a>"
+                                  ` ${r.source}</a>`
                                 );
                               }
                               return match;
@@ -398,8 +411,20 @@ export function SearchLayout({
                       {highlightMatches(result.title, query)}
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      Source: {result.source} &middot; Citation:{" "}
-                      {result.citation}
+                      Source:{" "}
+                      {result.source_url ? (
+                        <a
+                          href={result.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-primary underline-offset-2 hover:underline"
+                        >
+                          {result.source}
+                        </a>
+                      ) : (
+                        result.source
+                      )}{" "}
+                      &middot; Citation: {result.citation}
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="shrink-0">
