@@ -2,82 +2,94 @@
 
 ## Frontend
 
-- `Next.js`
+- `Next.js` 16
   - Chosen for the main app shell, project views, and admin surfaces
-- `React`
+- `React` 19
   - Used for component-driven UI and interactive search experiences
-- `Tailwind CSS`
+- `Tailwind CSS` 4
   - Keeps the UI fast to iterate on and easy to style consistently
 - `shadcn/ui`
   - Provides accessible, composable UI primitives for dashboards and forms
 - `Prisma Client JS`
-  - Lets the frontend read project and source metadata directly from Neon during the scaffold phase
+  - Lets the frontend read project and source metadata directly from Neon
+- `lucide-react`
+  - Icon library for UI elements
 
 ## Backend
 
 - `FastAPI`
   - Fits the planned API-first ingestion and retrieval workflow
-- `Python`
-  - Useful for retrieval pipelines, document processing, and AI tooling
+- `Python` 3.13
+  - Runtime for the backend
 - `Pydantic`
-  - Good fit for strict request and response schemas
+  - Good fit for strict request and response schemas and settings management
 - `Prisma Client Python`
   - Gives the backend a type-safe way to read and write the shared metadata tables
+- `pypdf`
+  - PDF text extraction for document ingestion
+- `httpx`
+  - Async HTTP client for fetching URL-based sources
+- `boto3`
+  - S3-compatible client for Cloudflare R2 file storage
+- `aio-pika`
+  - Async RabbitMQ client for the CloudAMQP ingestion queue
+- `pinecone` SDK
+  - Vector database client for semantic search operations
 
 ## Data and Storage
 
 - `Neon` PostgreSQL
-  - Managed database for projects, sources, metadata, and application state
+  - Managed database for projects, sources, chunks, and ingestion runs
 - `Prisma schema`
-  - Shared model definition for both apps
+  - Shared model definition for both apps (4 models: Project, Source, Chunk, IngestionRun)
 - `Prisma config`
-  - Used by the frontend Prisma CLI to keep the Neon connection string out of `schema.prisma`
-- `Prisma Python`
-  - The backend client and CLI path use `backend/prisma.config.ts` so the connection URL is not stored directly in schema.prisma
+  - Used by both frontend and backend Prisma CLIs to keep the Neon connection string out of `schema.prisma`
 - `Pinecone`
-  - Managed vector store for semantic retrieval from day one
-  - Supports hosted-embedding indexes where the query text can be passed directly and Pinecone converts it to a vector automatically
+  - Managed vector store for semantic retrieval
+  - Uses `multilingual-e5-large` hosted-embedding index — query text is passed directly and Pinecone converts it to a vector automatically
   - Uses namespaces for multi-project separation so one shared index can host many project embeddings safely
-- File/object storage
-  - Stores raw documents and extracted content
+- `Cloudflare R2`
+  - S3-compatible object storage for raw PDF documents
+- `CloudAMQP`
+  - Managed RabbitMQ task queue for asynchronous document ingestion
 
 ## Retrieval and Search
 
 - Chunking pipeline
-  - Breaks source documents into retrievable units
+  - Breaks source documents into retrievable units (1000 chars, 200-char overlap)
 - Keyword search
-  - Supports exact-match and lexical retrieval
+  - PostgreSQL `CONTAINS` fallback for exact-match and lexical retrieval
 - Vector search
-  - Supports semantic retrieval from embeddings
+  - Semantic retrieval via Pinecone Inference embeddings
 - Hybrid retrieval
-  - Combines lexical and semantic results
+  - Combines lexical (PostgreSQL) and semantic (Pinecone) results
 - Reranking
-  - Improves relevance before generation
+  - *Not yet implemented* — planned for Stage 4
 
 ## AI and Generation
 
-- Embeddings provider to be selected during implementation
-  - Needed for semantic search and similarity scoring
-- LLM provider to be selected during implementation
-  - Used for grounded answer generation
+- Embeddings provider
+  - **Implemented**: Pinecone Inference `multilingual-e5-large` (batched 96 vectors per request)
+- LLM provider
+  - *Not yet implemented* — needed for grounded answer generation (Stage 3)
 - Optional reranker model or API
-  - Improves ranking quality for top results
+  - *Not yet implemented* — planned for Stage 4
 
 ## Observability
 
 - Retrieval traces
-  - Show what was searched and why a result was selected
+  - *Not yet implemented* — planned for Stage 4
 - Evaluation datasets
-  - Support repeatable quality checks
+  - *Not yet implemented* — planned for Stage 4
 - Query analytics
-  - Help track usage and failure modes
+  - *Not yet implemented* — planned for Stage 4
 - Citation inspection
-  - Makes grounded answers easier to verify
+  - *Not yet implemented* — planned for Stage 4
 
 ## Deployment
 
 - Docker
-  - Keeps local development and deployment consistent
+  - *Not yet implemented* — planned for Stage 5
 - Environment variables
   - Separate configuration from code, including the shared Neon connection string
 - Local-first workflow

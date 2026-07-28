@@ -65,19 +65,39 @@ Visit:
 
 ### `app/page.tsx`
 
-Landing page and product overview.
+Landing page and product overview — hero section, core capabilities cards, architecture diagram.
 
 ### `app/projects/page.tsx`
 
-Project directory, powered by Prisma data from Neon.
+Project directory — fetches all projects from the backend API, links to project search and admin.
 
-### `app/projects/*/admin/page.tsx`
+### `app/projects/[slug]/page.tsx`
 
-Project-specific source management pages.
+Per-project search page — server component that renders `SearchLayout` with hybrid search, score badges, loading skeletons, and empty states.
+
+### `app/admin/page.tsx`
+
+Admin dashboard — lists all projects with links to per-project admin panels.
+
+### `app/admin/projects/[slug]/page.tsx`
+
+Per-project admin page — server component that renders `ProjectAdminPanel`.
+
+### `components/search-layout.tsx`
+
+Search UI — search form with hybrid toggle, loading skeletons, result cards with source badges and scores, empty states.
 
 ### `components/project-admin-panel.tsx`
 
-The interactive admin scaffold for adding PDF and URL sources.
+Admin panel — project stats card, add-source form (PDF upload / URL input with notes), sources table with status badges, cancel/delete actions, auto-polling every 5s for active sources.
+
+### `components/site-shell.tsx`
+
+App shell — sticky header with navigation (Home, Projects, Admin), mobile hamburger menu, footer.
+
+### `components/ui/`
+
+shadcn/ui primitives — `badge.tsx`, `button.tsx`, `card.tsx`, `input.tsx`.
 
 ### `lib/prisma.ts`
 
@@ -85,17 +105,21 @@ Creates the Prisma client for the frontend using the Neon adapter.
 
 ### `lib/projects.ts`
 
-Fetches and seeds project/source metadata for the scaffold.
+Fetches project and source metadata from the backend API — `getProjects()`, `getProjectBySlug()`.
+
+### `lib/env.ts`
+
+Loads the backend `.env` file so the frontend Prisma client can read `NEON_CONNECTION_STRING`.
 
 ### `prisma/schema.prisma`
 
-Shared database schema for projects, sources, chunks, and ingestion runs.
+Shared database schema — 4 models: Project, Source, Chunk, IngestionRun.
 
 ### `prisma.config.ts`
 
-This is where Prisma reads the shared Neon database URL for frontend CLI commands.
+Prisma CLI config — reads the shared Neon database URL from `backend/.env` for frontend CLI commands.
 
 ## Environment variables
 
-- `NEON_CONNECTION_STRING`
+- `NEON_CONNECTION_STRING` — Neon PostgreSQL connection string (loaded from `backend/.env`)
 

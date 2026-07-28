@@ -100,6 +100,16 @@ Visit:
 
 `/docs` is the auto-generated FastAPI documentation.
 
+### 7) Run the ingestion worker (separate terminal)
+
+The worker processes queued ingestion tasks (PDF chunking, embedding, Pinecone upsert):
+
+```bash
+python -m app.services.worker
+```
+
+Run this in a separate terminal while the API server is running.
+
 ## File map
 
 ### `pyproject.toml`
@@ -137,27 +147,73 @@ The syntax means:
 
 ### `app/api/routes/projects.py`
 
-This is where the project and source API endpoints live.
+Project and source API endpoints — list projects, get project details, list sources, search, create sources.
+
+### `app/api/routes/sources.py`
+
+Source management endpoints — delete and cancel sources (cascades to Pinecone vectors, R2 objects, and DB).
+
+### `app/api/routes/uploads.py`
+
+Upload endpoints — create upload (returns presigned URL), upload file bytes, finalize upload (triggers ingestion).
 
 ### `app/api/schemas.py`
 
-These are the request and response models used by the API.
+Request and response models used by the API — `ProjectOut`, `SourceOut`, `SourceCreateInput`, `UploadCreateOut`, `SearchResultOut`, etc.
 
 ### `app/core/config.py`
 
-This loads environment variables.
+Loads environment variables via Pydantic Settings. Reads from `.env` for:
 
-FastAPI apps usually keep secrets and environment-specific values out of code. That is why this file reads from `.env`.
+- `APP_ENV`, `CORS_ORIGINS`
+- `NEON_CONNECTION_STRING`
+- `PINECONE_API_KEY`, `PINECONE_INDEX`, `PINECONE_CLOUD`, `PINECONE_REGION`
+- `CLOUDAMQP_URL`
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ACCOUNT_ID`
 
+### `app/services/pinecone.py`
 
+Pinecone vector DB client — lazy-init, batched embedding (`multilingual-e5-large`), upsert, query, delete.
+
+### `app/services/ingest.py`
+
+Document ingestion pipeline — PDF text extraction (`pypdf`), URL fetching (`httpx`), text chunking (1000 chars, 200 overlap), batch embedding + Pinecone upsert, status tracking.
+
+### `app/services/queue.py`
+
+CloudAMQP (RabbitMQ) publisher — enqueues ingestion tasks to the `ingestion` exchange.
+
+### `app/services/worker.py`
+
+Standalone async worker — connects to DB, listens on `ingestion.queue`, calls `ingest_source` for each message.
+
+### `app/services/storage.py`
+
+Cloudflare R2 client — S3-compatible object storage for PDFs, presigned URL generation.
+
+### `app/services/uploads.py`
+
+Upload orchestration — creates source records, generates presigned URLs, handles direct upload and finalization.
+
+### `app/services/projects.py`
+
+Project and source data access — CRUD, search with Pinecone vector + PostgreSQL keyword fallback.
+
+### `app/services/sources.py`
+
+Source lifecycle management — delete (cascades Pinecone → R2 → DB), cancel (QUEUED/PROCESSING → CANCELLED).
+
+### `app/db.py`
+
+Prisma client singleton — connects/disconnects on app lifespan.
 
 ### `.env`
 
-This file is for local secrets only. Do not commit it.
+Local secrets only. Do not commit it.
 
 ### `.env.example`
 
-This is a safe template showing the variables the app expects.
+Safe template showing all variables the app expects.
 
 ## Beginner syntax notes
 
