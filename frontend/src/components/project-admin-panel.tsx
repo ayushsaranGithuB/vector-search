@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,6 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -60,7 +60,6 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       return;
 
     setActionLoading(sourceId);
-    setStatusMessage(`Deleting "${sourceName}"...`);
 
     const response = await fetch(`${backendUrl}/sources/${sourceId}`, {
       method: "DELETE",
@@ -68,10 +67,12 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
 
     if (response.ok) {
       setSources((current) => current.filter((s) => s.id !== sourceId));
-      setStatusMessage(`"${sourceName}" deleted successfully.`);
+      toast.success(`"${sourceName}" deleted successfully.`);
     } else {
       const error = await response.text();
-      setStatusMessage(`Failed to delete "${sourceName}": ${error}`);
+      toast.error(`Failed to delete "${sourceName}"`, {
+        description: error,
+      });
     }
     setActionLoading(null);
   }
@@ -85,7 +86,6 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       return;
 
     setActionLoading(sourceId);
-    setStatusMessage(`Cancelling "${sourceName}"...`);
 
     const response = await fetch(`${backendUrl}/sources/${sourceId}/cancel`, {
       method: "POST",
@@ -97,10 +97,12 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
           s.id === sourceId ? { ...s, status: "cancelled" as const } : s,
         ),
       );
-      setStatusMessage(`"${sourceName}" cancelled.`);
+      toast.success(`"${sourceName}" cancelled.`);
     } else {
       const error = await response.text();
-      setStatusMessage(`Failed to cancel "${sourceName}": ${error}`);
+      toast.error(`Failed to cancel "${sourceName}"`, {
+        description: error,
+      });
     }
     setActionLoading(null);
   }
@@ -139,21 +141,19 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     const trimmedValue = sourceValue.trim();
 
     if (!trimmedName) {
-      setStatusMessage("Add a source name to continue.");
+      toast.error("Add a source name to continue.");
       return;
     }
 
     if (sourceType === "pdf" && !selectedFile) {
-      setStatusMessage("Choose a PDF file before submitting.");
+      toast.error("Choose a PDF file before submitting.");
       return;
     }
 
     if (sourceType === "url" && !trimmedValue) {
-      setStatusMessage("Enter a URL before submitting.");
+      toast.error("Enter a URL before submitting.");
       return;
     }
-
-    setStatusMessage("Creating source and preparing upload...");
 
     const payload = {
       project: project.slug,
@@ -173,7 +173,9 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     });
 
     if (!response.ok) {
-      setStatusMessage(`Failed to add source: ${response.statusText}`);
+      toast.error("Failed to add source", {
+        description: response.statusText,
+      });
       return;
     }
 
@@ -193,9 +195,9 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
-        setStatusMessage(
-          `Failed to upload PDF to the backend: ${uploadResponse.status} ${errorText}`,
-        );
+        toast.error("Failed to upload PDF", {
+          description: `${uploadResponse.status} ${errorText}`,
+        });
         return;
       }
     }
@@ -209,7 +211,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    setStatusMessage(
+    toast.success(
       sourceType === "pdf"
         ? `${trimmedName} was queued and uploaded to R2.`
         : `${trimmedName} was queued for ingestion.`,
@@ -360,14 +362,10 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                 </Button>
               </div>
 
-              {statusMessage ? (
-                <p className="text-sm text-muted-foreground">{statusMessage}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Source metadata will later be stored in managed Postgres,
-                  while embeddings go to Pinecone.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Source metadata will later be stored in managed Postgres, while
+                embeddings go to Pinecone.
+              </p>
             </form>
           </CardContent>
         </Card>
