@@ -1,46 +1,39 @@
-# Stage 1
+﻿# Stage 1: Foundation
 
-[] FastAPI fundamentals
-[] Python project structure
-[] Learn embeddings
-[] Integrate pgvector or Qdrant
-[] Build a simple ingestion pipeline
+- [ ] Set up the `FastAPI` backend structure
+- [ ] Set up the `Next.js` frontend structure
+- [ ] Choose the initial vector store path
+- [ ] Define the core project, source, and chunk concepts
+- [ ] Build a minimal ingestion path for one project
 
-# Stage 2
+# Stage 2: Retrieval
 
-[] Import documents
-[] Chunk them
-[] Generate embeddings
-[] Perform semantic search
+- [ ] Import source documents
+- [ ] Chunk documents consistently
+- [ ] Generate embeddings
+- [ ] Support semantic search
+- [ ] Store source metadata for filtering
 
-# Stage 3
+# Stage 3: Grounded Answers
 
-[] Hybrid search (BM25 + vector)
-[] Metadata filtering
-[] Citations
-[] Source highlighting
-[] Next.js frontend
+- [ ] Add hybrid search
+- [ ] Add citations and source highlighting
+- [ ] Build the first query UI in `Next.js`
+- [ ] Return grounded answers from the backend
+- [ ] Support opening source passages from answers
 
-# Stage 4
+# Stage 4: Quality And Observability
 
-[] Ask questions
-[] View grounded answers
-[] Click citations
-[] Navigate related documents
+- [ ] Add reranking
+- [ ] Add query analytics
+- [ ] Add evaluation datasets
+- [ ] Add retrieval traces
+- [ ] Add related-document or cross-link views
 
-# Stage 4
+# Stage 5: Multi-Project SaaS Polish
 
-[] Reranking
-[] Evaluation dashboard
-[] Query analytics
-[] Document relationships
-[] Better chunking
-
-# Stage 5
-
-[] Polish
-[] Docker
-[] Deployment
-[] Update README
-[] Demo video
-[] Performance improvements
+- [ ] Add a second demo project
+- [ ] Improve admin/project dashboards
+- [ ] Add Docker-based local and deployment support
+- [ ] Polish the README and docs
+- [ ] Record a demo flow and tighten performance
