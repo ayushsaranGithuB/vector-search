@@ -1,0 +1,16 @@
+﻿__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+.env
+
+# Packaging/build artifacts
+*.egg-info/
+*.dist-info/
+build/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
