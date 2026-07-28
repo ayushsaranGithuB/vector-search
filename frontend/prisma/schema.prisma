@@ -24,6 +24,7 @@ enum SourceStatus {
   PROCESSING
   PROCESSED
   FAILED
+  CANCELLED
 }
 
 enum IngestionStatus {
@@ -31,6 +32,7 @@ enum IngestionStatus {
   RUNNING
   COMPLETED
   FAILED
+  CANCELLED
 }
 
 model Project {

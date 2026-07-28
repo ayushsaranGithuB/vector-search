@@ -1,0 +1,10 @@
+Let's make this E2E setup work
+
+User uploads a PDF
+File is saved to Cloudflare R2
+Task is added to Queue for ingestion into Pinecone
+Document metadata shows up in admin dashboard as under processing
+A worker reads the queue and grabs the pdf, chunks and encodes it using Pinecone Inference into the correct place for the project it is related to
+When the task is completed it is cleared from queue
+The PDF appears in dashboard as ready source
+Search works on frontend and can use this source for citations

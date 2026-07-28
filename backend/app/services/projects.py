@@ -157,6 +157,8 @@ def source_status_label(status: object) -> SourceStatusLabel:
         return "processing"
     if value == "FAILED":
         return "failed"
+    if value == "CANCELLED":
+        return "cancelled"
     return "queued"
 
 

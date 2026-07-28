@@ -2,7 +2,7 @@
 from typing import Literal
 
 SourceTypeLabel = Literal["pdf", "url"]
-SourceStatusLabel = Literal["processed", "processing", "queued", "failed"]
+SourceStatusLabel = Literal["processed", "processing", "queued", "failed", "cancelled"]
 
 
 class SearchResultOut(BaseModel):

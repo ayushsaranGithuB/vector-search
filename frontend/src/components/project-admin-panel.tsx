@@ -27,6 +27,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const totals = sources.reduce(
@@ -35,10 +36,68 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       acc.processed += source.status === "processed" ? 1 : 0;
       acc.queued += source.status === "queued" ? 1 : 0;
       acc.failed += source.status === "failed" ? 1 : 0;
+      acc.cancelled += source.status === "cancelled" ? 1 : 0;
       return acc;
     },
-    { totalChunks: 0, processed: 0, queued: 0, failed: 0 },
+    { totalChunks: 0, processed: 0, queued: 0, failed: 0, cancelled: 0 },
   );
+
+  const backendUrl =
+    process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
+  async function handleDelete(sourceId: string, sourceName: string) {
+    if (
+      !confirm(
+        `Delete "${sourceName}"? This will remove it from Pinecone, the database, and R2.`,
+      )
+    )
+      return;
+
+    setActionLoading(sourceId);
+    setStatusMessage(`Deleting "${sourceName}"...`);
+
+    const response = await fetch(`${backendUrl}/sources/${sourceId}`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      setSources((current) => current.filter((s) => s.id !== sourceId));
+      setStatusMessage(`"${sourceName}" deleted successfully.`);
+    } else {
+      const error = await response.text();
+      setStatusMessage(`Failed to delete "${sourceName}": ${error}`);
+    }
+    setActionLoading(null);
+  }
+
+  async function handleCancel(sourceId: string, sourceName: string) {
+    if (
+      !confirm(
+        `Cancel "${sourceName}"? This will stop processing and clean up any partial data.`,
+      )
+    )
+      return;
+
+    setActionLoading(sourceId);
+    setStatusMessage(`Cancelling "${sourceName}"...`);
+
+    const response = await fetch(`${backendUrl}/sources/${sourceId}/cancel`, {
+      method: "POST",
+    });
+
+    if (response.ok) {
+      setSources((current) =>
+        current.map((s) =>
+          s.id === sourceId ? { ...s, status: "cancelled" as const } : s,
+        ),
+      );
+      setStatusMessage(`"${sourceName}" cancelled.`);
+    } else {
+      const error = await response.text();
+      setStatusMessage(`Failed to cancel "${sourceName}": ${error}`);
+    }
+    setActionLoading(null);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,8 +131,6 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       notes,
     };
 
-    const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
     const response = await fetch(`${backendUrl}/uploads`, {
       method: "POST",
       headers: {
@@ -159,6 +216,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
             <StatRow label="Processed" value={String(totals.processed)} />
             <StatRow label="Queued" value={String(totals.queued)} />
             <StatRow label="Failed" value={String(totals.failed)} />
+            <StatRow label="Cancelled" value={String(totals.cancelled)} />
             <StatRow label="Chunks" value={String(totals.totalChunks)} />
           </CardContent>
         </Card>
@@ -292,24 +350,26 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
           </CardHeader>
           <CardContent>
             <div className="overflow-hidden rounded-lg border border-border/60">
-              <div className="grid grid-cols-7 gap-4 border-b border-border bg-muted/40 px-4 py-3 text-sm font-medium">
+              <div className="grid grid-cols-8 gap-4 border-b border-border bg-muted/40 px-4 py-3 text-sm font-medium">
                 <span className="col-span-2">Source</span>
                 <span>Type</span>
                 <span>Status</span>
                 <span>Added</span>
                 <span>Size</span>
                 <span>Chunks</span>
-                <span>Synced</span>
+                <span>Actions</span>
               </div>
               <div className="divide-y divide-border">
                 {sources.map((source) => (
                   <div
                     key={source.id}
-                    className="grid grid-cols-7 gap-4 px-4 py-4 text-sm"
+                    className="grid grid-cols-8 gap-4 px-4 py-4 text-sm items-center"
                   >
                     <div className="col-span-2">
                       <p className="font-medium">{source.name}</p>
-                      <p className="text-muted-foreground">{source.source}</p>
+                      <p className="text-muted-foreground truncate">
+                        {source.source}
+                      </p>
                     </div>
                     <div className="capitalize text-muted-foreground">
                       {source.type}
@@ -324,8 +384,26 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                     </div>
                     <div className="text-muted-foreground">{source.size}</div>
                     <div className="text-muted-foreground">{source.chunks}</div>
-                    <div className="text-muted-foreground">
-                      {source.lastSynced}
+                    <div className="flex gap-2">
+                      {(source.status === "queued" ||
+                        source.status === "processing") && (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          disabled={actionLoading === source.id}
+                          onClick={() => handleCancel(source.id, source.name)}
+                        >
+                          {actionLoading === source.id ? "..." : "Cancel"}
+                        </Button>
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="xs"
+                        disabled={actionLoading === source.id}
+                        onClick={() => handleDelete(source.id, source.name)}
+                      >
+                        {actionLoading === source.id ? "..." : "Delete"}
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -350,5 +428,6 @@ function StatRow({ label, value }: { label: string; value: string }) {
 function badgeVariantForStatus(status: ProjectSource["status"]) {
   if (status === "processed") return "default";
   if (status === "failed") return "destructive";
+  if (status === "cancelled") return "outline";
   return "secondary";
 }
