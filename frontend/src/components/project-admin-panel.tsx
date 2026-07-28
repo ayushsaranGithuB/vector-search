@@ -19,6 +19,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  FileText,
+  Globe,
+  FileUp,
+  Trash2,
+  XCircle,
+  RefreshCw,
+  Loader2,
+} from "lucide-react";
 import type { ProjectRecord, ProjectSource, SourceType } from "@/lib/projects";
 
 interface ProjectAdminPanelProps {
@@ -30,11 +39,11 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
   const [sourceType, setSourceType] = useState<SourceType>("pdf");
   const [name, setName] = useState("");
   const [sourceValue, setSourceValue] = useState("");
-  const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const titleFetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totals = sources.reduce(
     (acc, source) => {
@@ -134,16 +143,67 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     return () => clearInterval(interval);
   }, [hasActiveSources, fetchSources]);
 
+  // Auto-fetch page title from URL when URL input changes
+  useEffect(() => {
+    if (sourceType !== "url") {
+      if (titleFetchRef.current) clearTimeout(titleFetchRef.current);
+      return;
+    }
+
+    const trimmed = sourceValue.trim();
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
+      return;
+
+    if (titleFetchRef.current) clearTimeout(titleFetchRef.current);
+
+    titleFetchRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${backendUrl}/fetch-title?url=${encodeURIComponent(trimmed)}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.title) {
+            setName(data.title);
+          }
+        }
+      } catch {
+        // Silently fail — user can still type a name manually
+      }
+    }, 800);
+
+    return () => {
+      if (titleFetchRef.current) clearTimeout(titleFetchRef.current);
+    };
+  }, [sourceValue, sourceType, backendUrl]);
+
+  // Clear URL input when switching back to PDF
+  useEffect(() => {
+    if (sourceType === "pdf") {
+      setSourceValue("");
+    }
+  }, [sourceType]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const trimmedName = name.trim();
-    const trimmedValue = sourceValue.trim();
+    let trimmedValue = sourceValue.trim();
 
-    if (!trimmedName) {
-      toast.error("Add a source name to continue.");
-      return;
+    // Auto-prepend https:// if no scheme is provided
+    if (
+      sourceType === "url" &&
+      trimmedValue &&
+      !/^https?:\/\//i.test(trimmedValue)
+    ) {
+      trimmedValue = `https://${trimmedValue}`;
+      setSourceValue(trimmedValue);
     }
+
+    // Auto-derive the name from the fetched title (URL) or file name (PDF)
+    const trimmedName =
+      sourceType === "url"
+        ? name.trim() || trimmedValue
+        : selectedFileName?.replace(/\.[^.]+$/, "") || "Untitled source";
 
     if (sourceType === "pdf" && !selectedFile) {
       toast.error("Choose a PDF file before submitting.");
@@ -161,16 +221,27 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       type: sourceType,
       source: sourceType === "url" ? trimmedValue : undefined,
       file_name: sourceType === "pdf" ? selectedFileName : undefined,
-      notes,
     };
 
-    const response = await fetch(`${backendUrl}/uploads`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    let response;
+    try {
+      response = await fetch(`${backendUrl}/uploads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      const hint =
+        sourceType === "url"
+          ? `Make sure the backend is running at ${backendUrl} and the URL is reachable.`
+          : `Make sure the backend is running at ${backendUrl}.`;
+      toast.error("Could not reach the backend", {
+        description: hint,
+      });
+      return;
+    }
 
     if (!response.ok) {
       toast.error("Failed to add source", {
@@ -179,19 +250,33 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       return;
     }
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      toast.error("Invalid response from backend");
+      return;
+    }
 
     if (selectedFile) {
       const formData = new FormData();
       formData.append("file", selectedFile, selectedFile.name);
 
-      const uploadResponse = await fetch(
-        `${backendUrl}/uploads/${result.source.id}/upload`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+      let uploadResponse;
+      try {
+        uploadResponse = await fetch(
+          `${backendUrl}/uploads/${result.source.id}/upload`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+      } catch {
+        toast.error("Could not upload PDF", {
+          description: `Make sure the backend is running at ${backendUrl}.`,
+        });
+        return;
+      }
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
@@ -205,7 +290,6 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     setSources((current) => [result.source, ...current]);
     setName("");
     setSourceValue("");
-    setNotes("");
     setSelectedFile(null);
     setSelectedFileName("");
     if (fileInputRef.current) {
@@ -234,7 +318,10 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
           <Link href="/projects">
             <Button variant="outline">Back to Projects</Button>
           </Link>
-          <Button>Sync Sources</Button>
+          <Button>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Sync Sources
+          </Button>
         </div>
       </div>
 
@@ -271,6 +358,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                   variant={sourceType === "pdf" ? "default" : "outline"}
                   onClick={() => setSourceType("pdf")}
                 >
+                  <FileText className="mr-2 h-4 w-4" />
                   PDF
                 </Button>
                 <Button
@@ -278,20 +366,9 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                   variant={sourceType === "url" ? "default" : "outline"}
                   onClick={() => setSourceType("url")}
                 >
+                  <Globe className="mr-2 h-4 w-4" />
                   URL
                 </Button>
-              </div>
-
-              <div className="grid gap-2">
-                <label htmlFor="source-name" className="text-sm font-medium">
-                  Source name
-                </label>
-                <Input
-                  id="source-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Motor Vehicles Act, 1988"
-                />
               </div>
 
               {sourceType === "pdf" ? (
@@ -299,7 +376,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                   <label htmlFor="source-file" className="text-sm font-medium">
                     PDF file
                   </label>
-                  <Input
+                  <input
                     id="source-file"
                     type="file"
                     accept="application/pdf"
@@ -309,6 +386,8 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                       setSelectedFile(file);
                       setSelectedFileName(file?.name ?? "");
                     }}
+                    data-slot="input"
+                    className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
                   />
                   <p className="text-xs text-muted-foreground">
                     The browser uploads the PDF directly to R2 after the backend
@@ -332,29 +411,17 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                 </div>
               )}
 
-              <div className="grid gap-2">
-                <label htmlFor="source-notes" className="text-sm font-medium">
-                  Notes
-                </label>
-                <textarea
-                  id="source-notes"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  rows={4}
-                  placeholder="Describe why this source matters and what should happen during ingestion."
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-
               <div className="flex flex-wrap gap-3">
-                <Button type="submit">Add Source</Button>
+                <Button type="submit">
+                  <FileUp className="mr-2 h-4 w-4" />
+                  Add Source
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setName("");
                     setSourceValue("");
-                    setNotes("");
                     setSelectedFileName("");
                   }}
                 >
@@ -371,97 +438,118 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
         </Card>
       </div>
 
-      <div className="mt-8">
-        <Card className="border-border/50">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Sources</CardTitle>
-                <CardDescription>
-                  Track what has been added, processed, and chunked.
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-3">
-                {hasActiveSources && (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-                    Auto-refreshing
-                  </span>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchSources}
-                  disabled={hasActiveSources}
-                >
-                  {hasActiveSources ? "Auto..." : "Refresh"}
-                </Button>
-              </div>
+      <div className="mt-16">
+        <CardHeader>
+          <div className="flex items-center justify-between  border-b-3 border-border/50 px-4 py-2">
+            <div className="space-y-1 mb-2">
+              <CardTitle className="text-2xl font-bold">Sources</CardTitle>
+              <CardDescription>
+                Track what has been added, processed, and chunked.
+              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-hidden rounded-lg border border-border/60">
-              <div className="grid grid-cols-8 gap-4 border-b border-border bg-muted/40 px-4 py-3 text-sm font-medium">
-                <span className="col-span-2">Source</span>
-                <span>Type</span>
-                <span>Status</span>
-                <span>Added</span>
-                <span>Size</span>
-                <span>Chunks</span>
-                <span>Actions</span>
-              </div>
-              <div className="divide-y divide-border">
-                {sources.map((source) => (
-                  <div
-                    key={source.id}
-                    className="grid grid-cols-8 gap-4 px-4 py-4 text-sm items-center"
-                  >
-                    <div className="col-span-2">
-                      <p className="font-medium">{source.name}</p>
-                      <p className="text-muted-foreground truncate">
-                        {source.source}
-                      </p>
-                    </div>
-                    <div className="capitalize text-muted-foreground">
-                      {source.type}
-                    </div>
-                    <div>
-                      <Badge variant={badgeVariantForStatus(source.status)}>
-                        {source.status}
-                      </Badge>
-                    </div>
-                    <div className="text-muted-foreground">
-                      {source.addedAt}
-                    </div>
-                    <div className="text-muted-foreground">{source.size}</div>
-                    <div className="text-muted-foreground">{source.chunks}</div>
-                    <div className="flex gap-2">
-                      {(source.status === "queued" ||
-                        source.status === "processing") && (
-                        <Button
-                          variant="outline"
-                          size="xs"
-                          disabled={actionLoading === source.id}
-                          onClick={() => handleCancel(source.id, source.name)}
-                        >
-                          {actionLoading === source.id ? "..." : "Cancel"}
-                        </Button>
+            <div className="flex items-center gap-3">
+              {hasActiveSources && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                  Auto-refreshing
+                </span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchSources}
+                disabled={hasActiveSources}
+              >
+                {hasActiveSources ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {hasActiveSources ? "Auto..." : "Refresh"}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="overflow-hidden rounded-lg border border-border/60">
+            <div className="grid grid-cols-8 gap-4 border-b border-border bg-muted/40 px-4 py-3 text-sm font-medium">
+              <span className="col-span-2">Source</span>
+              <span>Type</span>
+              <span>Status</span>
+              <span>Added</span>
+              <span>Size</span>
+              <span>Chunks</span>
+              <span>Actions</span>
+            </div>
+            <div className="divide-y divide-border">
+              {sources.map((source) => (
+                <div
+                  key={source.id}
+                  className="grid grid-cols-8 gap-4 px-4 py-4 text-sm items-center"
+                >
+                  <div className="col-span-2">
+                    <p className="font-medium">{source.name}</p>
+                    <p className="text-muted-foreground truncate flex items-center gap-1">
+                      {source.type === "pdf" ? (
+                        <FileText className="h-3 w-3 shrink-0" />
+                      ) : (
+                        <Globe className="h-3 w-3 shrink-0" />
                       )}
+                      {source.source}
+                    </p>
+                  </div>
+                  <div className="capitalize text-muted-foreground flex items-center gap-1">
+                    {source.type === "pdf" ? (
+                      <FileText className="h-3.5 w-3.5" />
+                    ) : (
+                      <Globe className="h-3.5 w-3.5" />
+                    )}
+                    {source.type}
+                  </div>
+                  <div>
+                    <Badge variant={badgeVariantForStatus(source.status)}>
+                      {source.status}
+                    </Badge>
+                  </div>
+                  <div className="text-muted-foreground">{source.addedAt}</div>
+                  <div className="text-muted-foreground">{source.size}</div>
+                  <div className="text-muted-foreground">{source.chunks}</div>
+                  <div className="flex gap-2">
+                    {(source.status === "queued" ||
+                      source.status === "processing") && (
                       <Button
-                        variant="destructive"
+                        variant="outline"
                         size="xs"
                         disabled={actionLoading === source.id}
-                        onClick={() => handleDelete(source.id, source.name)}
+                        onClick={() => handleCancel(source.id, source.name)}
                       >
-                        {actionLoading === source.id ? "..." : "Delete"}
+                        {actionLoading === source.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5" />
+                        )}
+                        <span className="ml-1.5">Cancel</span>
                       </Button>
-                    </div>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="xs"
+                      disabled={actionLoading === source.id}
+                      onClick={() => handleDelete(source.id, source.name)}
+                    >
+                      {actionLoading === source.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                      <span className="ml-1.5">Delete</span>
+                    </Button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
       </div>
     </div>
   );

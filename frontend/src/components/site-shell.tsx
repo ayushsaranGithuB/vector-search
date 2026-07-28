@@ -8,8 +8,8 @@ import { BowArrow } from "lucide-react";
 
 const navLinks = [
   { href: "/", label: "Home" },
+  { href: "/projects/motor-vehicle-rules", label: "Demo" },
   { href: "/docs", label: "Docs" },
-  { href: "/admin", label: "Admin" },
 ];
 
 const footerLinks = [
@@ -46,8 +46,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link href="/projects" className="hidden md:inline-flex">
-              <Button size="sm">Projects</Button>
+            <Link href="/admin" className="hidden md:inline-flex">
+              <Button size="sm">Admin</Button>
             </Link>
             <button
               type="button"
@@ -102,7 +102,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 min-h-[80vh]">{children}</main>
 
       <footer className="border-t border-border bg-muted/50 text-sm text-muted-foreground">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
