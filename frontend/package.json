@@ -6,10 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "prisma generate --config ./prisma.config.ts",
+    "db:push": "prisma db push --config ./prisma.config.ts",
+    "db:studio": "prisma studio --config ./prisma.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@next/env": "^16.2.12",
+    "@prisma/adapter-neon": "^7.9.1",
+    "@prisma/client": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.27.0",
@@ -27,6 +33,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "prisma": "latest",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

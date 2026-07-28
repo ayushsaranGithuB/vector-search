@@ -1,0 +1,99 @@
+// Prisma schema for the frontend app.
+// This talks to the shared Neon database used by both apps.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProjectStatus {
+  LIVE_DEMO
+  COMING_SOON
+}
+
+enum SourceType {
+  PDF
+  URL
+}
+
+enum SourceStatus {
+  QUEUED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum IngestionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  description String
+  status      ProjectStatus @default(COMING_SOON)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  sources     Source[]
+
+  @@index([slug])
+}
+
+model Source {
+  id             String         @id @default(cuid())
+  project_id     String
+  project        Project        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  name           String
+  source_type    SourceType
+  source_url     String?
+  file_name      String?
+  notes          String?
+  status         SourceStatus   @default(QUEUED)
+  size_bytes     Int?
+  chunk_count    Int            @default(0)
+  chunk_size     Int?
+  chunk_overlap  Int?
+  last_synced_at DateTime?
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @updatedAt
+  chunks         Chunk[]
+  ingestion_runs IngestionRun[]
+
+  @@index([project_id, created_at])
+}
+
+model Chunk {
+  id                 String   @id @default(cuid())
+  source_id          String
+  source             Source   @relation(fields: [source_id], references: [id], onDelete: Cascade)
+  chunk_index        Int
+  content            String
+  token_count        Int?
+  pinecone_vector_id String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@index([source_id, chunk_index])
+}
+
+model IngestionRun {
+  id            String          @id @default(cuid())
+  source_id     String
+  source        Source          @relation(fields: [source_id], references: [id], onDelete: Cascade)
+  status        IngestionStatus @default(QUEUED)
+  started_at    DateTime?
+  finished_at   DateTime?
+  error_message String?
+  chunk_count   Int             @default(0)
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+
+  @@index([source_id, created_at])
+}

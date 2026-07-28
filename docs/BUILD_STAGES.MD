@@ -2,7 +2,8 @@
 
 - [ ] Set up the `FastAPI` backend structure
 - [ ] Set up the `Next.js` frontend structure
-- [ ] Wire up managed service configuration for PostgreSQL and Pinecone
+- [ ] Wire up managed service configuration for Neon PostgreSQL and Pinecone
+- [ ] Document Prisma config for the frontend and keep backend Prisma Python schema-based for now
 - [ ] Define the core project, source, and chunk concepts
 - [ ] Build a minimal ingestion path for one project
 
@@ -37,3 +38,6 @@
 - [ ] Add Docker-based local and deployment support
 - [ ] Polish the README and docs
 - [ ] Record a demo flow and tighten performance
+
+
+

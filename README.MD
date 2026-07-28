@@ -36,7 +36,9 @@ The goal is to demonstrate how modern vector search systems should work in pract
 
 - `Next.js` frontend for the user-facing app and admin surfaces
 - `FastAPI` backend for ingestion, retrieval, and answer generation
-- Managed vector store for semantic retrieval
+- `Prisma` clients in both apps for project and source metadata
+- `Neon`-hosted PostgreSQL for projects, sources, chunks, and ingestion runs
+- `Pinecone` for semantic retrieval
 - Hybrid search for combining keyword and embedding-based results
 - Reranking layer for improving result quality
 - Citation layer for grounded answers and source linking
@@ -50,16 +52,19 @@ The goal is to demonstrate how modern vector search systems should work in pract
 - `React`
 - `Tailwind CSS`
 - `shadcn/ui`
+- `Prisma Client JS`
 
 ### Backend
 
 - `FastAPI`
 - `Python`
 - `Pydantic`
+- `Prisma Client Python`
 
 ### Data and Storage
 
-- `Managed PostgreSQL`
+- `Neon` PostgreSQL
+- `Prisma` for schema management and data access
 - `Pinecone`
 - Document and metadata storage for projects and sources
 

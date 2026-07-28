@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,7 +131,7 @@ export default function Home() {
                   Domain Knowledge Base
                 </CardTitle>
                 <CardDescription className="text-base mt-2 leading-relaxed">
-                  A domain-specific knowledge project demonstrating the platform's reusability
+                  A domain-specific knowledge project demonstrating the platform&apos;s reusability
                   across different contexts and document types.
                 </CardDescription>
               </CardHeader>
@@ -151,7 +151,7 @@ export default function Home() {
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-4xl font-bold tracking-tight">Core Capabilities</h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Modern vector search systems should work in practice — here is what this platform delivers.
+              Modern vector search systems should work in practice - here is what this platform delivers.
             </p>
           </div>
           <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -205,7 +205,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-sm text-muted-foreground">
-              Vector Search SaaS — Built with Next.js, FastAPI, and shadcn/ui
+              Vector Search SaaS - Built with Next.js, FastAPI, and shadcn/ui
             </p>
             <div className="flex gap-6">
               <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">

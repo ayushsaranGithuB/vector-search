@@ -10,6 +10,8 @@
   - Keeps the UI fast to iterate on and easy to style consistently
 - `shadcn/ui`
   - Provides accessible, composable UI primitives for dashboards and forms
+- `Prisma Client JS`
+  - Lets the frontend read project and source metadata directly from Neon during the scaffold phase
 
 ## Backend
 
@@ -19,11 +21,19 @@
   - Useful for retrieval pipelines, document processing, and AI tooling
 - `Pydantic`
   - Good fit for strict request and response schemas
+- `Prisma Client Python`
+  - Gives the backend a type-safe way to read and write the shared metadata tables
 
 ## Data and Storage
 
-- `Managed PostgreSQL`
-  - Central store for projects, sources, metadata, and application state
+- `Neon` PostgreSQL
+  - Managed database for projects, sources, metadata, and application state
+- `Prisma schema`
+  - Shared model definition for both apps
+- `Prisma config`
+  - Used by the frontend Prisma CLI to keep the Neon connection string out of `schema.prisma`
+- `Prisma Python`
+  - The backend client and CLI path use `backend/prisma.config.ts` so the connection URL is not stored directly in schema.prisma
 - `Pinecone`
   - Managed vector store for semantic retrieval from day one
 - File/object storage
@@ -67,7 +77,7 @@
 - Docker
   - Keeps local development and deployment consistent
 - Environment variables
-  - Separate configuration from code, including Pinecone credentials
+  - Separate configuration from code, including the shared Neon connection string
 - Local-first workflow
   - Keep the initial setup simple and reproducible
 
@@ -81,3 +91,5 @@
   - Useful if orchestration complexity grows, but not required to define the base platform
 - Separate microservices
   - Not needed until the monolith stops being easy to maintain
+
+

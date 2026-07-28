@@ -9,6 +9,7 @@ This folder holds the API and backend logic. If you are new to FastAPI, think of
 - `main.py` = starts the app
 - `api/` = groups routes by purpose
 - `core/` = shared configuration and helpers
+- `services/` = database and data-shaping logic
 - `health.py` = a tiny first endpoint to prove the server is running
 
 ## Step-by-step setup
@@ -59,7 +60,23 @@ What this means:
 - `-e` means editable mode, so code changes are picked up immediately
 - `.[dev]` means install the project plus the optional `dev` tools from `pyproject.toml`
 
-### 4) Run the app
+### 4) Sync Prisma with Neon
+
+This backend uses Prisma Python, the shared Neon connection string stored in `backend/.env`, and `backend/prisma.config.ts` to keep the connection URL out of the schema.
+
+If you need to sync the schema manually, run:
+
+```bash
+.\.venv\Scripts\prisma.exe db push --schema .\prisma\schema.prisma
+```
+
+If you change the schema and want to regenerate the client, run:
+
+```bash
+.\.venv\Scripts\prisma.exe generate --schema .\prisma\schema.prisma
+```
+
+### 5) Run the app
 
 Start the server with Uvicorn:
 
@@ -73,7 +90,7 @@ What this means:
 - `app` is the FastAPI instance inside that file
 - `--reload` restarts the server whenever you edit code
 
-### 5) Open the first endpoint
+### 6) Open the first endpoint
 
 Visit:
 
@@ -118,11 +135,21 @@ The syntax means:
 - `def health_check()` defines a normal Python function
 - `-> dict[str, str]` is a type hint that says the function returns a dictionary of strings
 
+### `app/api/routes/projects.py`
+
+This is where the project and source API endpoints live.
+
+### `app/api/schemas.py`
+
+These are the request and response models used by the API.
+
 ### `app/core/config.py`
 
 This loads environment variables.
 
 FastAPI apps usually keep secrets and environment-specific values out of code. That is why this file reads from `.env`.
+
+
 
 ### `.env`
 
@@ -188,9 +215,12 @@ pip install -e .[dev]
 
 ## Environment variables
 
+- `NEON_CONNECTION_STRING`
 - `PINECONE_API_KEY`
 - `PINECONE_INDEX`
 - `PINECONE_CLOUD`
 - `PINECONE_REGION`
 - `APP_ENV`
 - `CORS_ORIGINS`
+
+
