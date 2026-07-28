@@ -36,7 +36,7 @@ The goal is to demonstrate how modern vector search systems should work in pract
 
 - `Next.js` frontend for the user-facing app and admin surfaces
 - `FastAPI` backend for ingestion, retrieval, and answer generation
-- Vector store for semantic retrieval
+- Managed vector store for semantic retrieval
 - Hybrid search for combining keyword and embedding-based results
 - Reranking layer for improving result quality
 - Citation layer for grounded answers and source linking
@@ -59,8 +59,8 @@ The goal is to demonstrate how modern vector search systems should work in pract
 
 ### Data and Storage
 
-- `PostgreSQL`
-- `pgvector` or `Qdrant`
+- `Managed PostgreSQL`
+- `Pinecone`
 - Document and metadata storage for projects and sources
 
 ### Retrieval

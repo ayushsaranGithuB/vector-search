@@ -2,7 +2,7 @@
 
 - [ ] Set up the `FastAPI` backend structure
 - [ ] Set up the `Next.js` frontend structure
-- [ ] Choose the initial vector store path
+- [ ] Wire up managed service configuration for PostgreSQL and Pinecone
 - [ ] Define the core project, source, and chunk concepts
 - [ ] Build a minimal ingestion path for one project
 
@@ -11,7 +11,7 @@
 - [ ] Import source documents
 - [ ] Chunk documents consistently
 - [ ] Generate embeddings
-- [ ] Support semantic search
+- [ ] Support semantic search through Pinecone
 - [ ] Store source metadata for filtering
 
 # Stage 3: Grounded Answers

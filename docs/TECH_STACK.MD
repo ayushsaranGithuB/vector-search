@@ -22,10 +22,10 @@
 
 ## Data and Storage
 
-- `PostgreSQL`
+- `Managed PostgreSQL`
   - Central store for projects, sources, metadata, and application state
-- `pgvector` or `Qdrant`
-  - Vector storage for semantic retrieval
+- `Pinecone`
+  - Managed vector store for semantic retrieval from day one
 - File/object storage
   - Stores raw documents and extracted content
 
@@ -67,14 +67,16 @@
 - Docker
   - Keeps local development and deployment consistent
 - Environment variables
-  - Separate configuration from code
+  - Separate configuration from code, including Pinecone credentials
 - Local-first workflow
   - Keep the initial setup simple and reproducible
 
 ## Deferred Alternatives
 
-- `Pinecone`
-  - Good alternative if managed vector infrastructure becomes desirable later
+- `Weaviate`
+  - Good alternative if you want a different managed vector platform later
+- `Neo4j`
+  - Best introduced as a graph layer for relationships and cross-links
 - `LangChain` or `LlamaIndex`
   - Useful if orchestration complexity grows, but not required to define the base platform
 - Separate microservices
