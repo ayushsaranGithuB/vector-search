@@ -5,6 +5,7 @@ from datetime import datetime
 from io import BytesIO
 import logging
 
+import aio_pika
 import boto3
 import httpx
 from botocore.config import Config
@@ -103,7 +104,7 @@ async def ingest_source(source_id: str) -> None:
                 vector_payload.append(
                     {
                         "id": chunk.id,
-                        "values": embed_text(content),
+                        "text": content,
                         "metadata": {
                             "source_id": source.id,
                             "source_name": source.name,
@@ -149,8 +150,9 @@ async def consume_ingestion_queue() -> None:
     connection = await aio_pika.connect_robust(settings.cloudamqp_url)
     async with connection:
         channel = await connection.channel()
+        exchange = await channel.declare_exchange("ingestion", aio_pika.ExchangeType.DIRECT, durable=True)
         queue = await channel.declare_queue("ingestion.queue", durable=True)
-        await queue.bind("ingestion", routing_key="source.ingest")
+        await queue.bind(exchange, routing_key="source.ingest")
 
         async with queue.iterator() as queue_iter:
             async for message in queue_iter:

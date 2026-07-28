@@ -11,9 +11,11 @@ dependencies = [
   "python-dotenv>=1.1.1",
   "prisma",
   "boto3>=1.28.0",
-  "aio-pika>=11.0.0",
+  "aio-pika>=0.11.1",
   "httpx>=0.28.1",
   "pypdf>=3.0.0",
+  "pinecone>=1.0.0",
+  "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]

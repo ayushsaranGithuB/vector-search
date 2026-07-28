@@ -3,6 +3,7 @@ from urllib.parse import quote
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from fastapi import UploadFile
 
 from app.api.schemas import SourceUploadCreateInput, SourceOut, UploadCreateOut
 from app.core.config import get_settings
@@ -39,6 +40,26 @@ def generate_presigned_upload_url(object_key: str) -> str:
             "ContentType": "application/pdf",
         },
         ExpiresIn=900,
+    )
+
+
+async def upload_source_file_to_r2(
+    source_id: str,
+    file_bytes: bytes,
+    content_type: str,
+    file_name: str,
+) -> None:
+    source = await prisma.source.find_unique(where={"id": source_id}, include={"project": True})
+    if source is None:
+        raise ValueError("Source not found")
+
+    object_key = build_r2_object_key(source.project.slug, source.id, file_name)
+    client = get_r2_client()
+    client.put_object(
+        Bucket=settings.r2_bucket_name,
+        Key=object_key,
+        Body=file_bytes,
+        ContentType=content_type,
     )
 
 

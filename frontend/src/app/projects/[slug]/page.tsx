@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { SearchLayout } from "@/components/search-layout";
 import { getProjectBySlug } from "@/lib/projects";
 
+export const dynamic = "force-dynamic";
+
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
 }

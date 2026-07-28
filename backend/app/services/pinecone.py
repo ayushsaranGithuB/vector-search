@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import pinecone
-except ImportError:  # pragma: no cover
+except Exception:  # pragma: no cover
     pinecone = None
 
 

@@ -27,29 +27,39 @@ export interface ProjectRecord {
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
 export async function getProjects(): Promise<ProjectRecord[]> {
-  const response = await fetch(`${backendUrl}/projects`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch projects: ${response.statusText}`);
-  }
+  try {
+    const response = await fetch(`${backendUrl}/projects`, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch projects: ${response.statusText}`);
+    }
 
-  const projects = await response.json();
-  return projects.map(mapProject);
+    const projects = await response.json();
+    return projects.map(mapProject);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown fetch error";
+    throw new Error(`Unable to load projects from backend (${backendUrl}): ${message}`);
+  }
 }
 
 export async function getProjectBySlug(slug: string): Promise<ProjectRecord | null> {
-  const response = await fetch(`${backendUrl}/projects/${encodeURIComponent(slug)}`, {
-    cache: "no-store",
-  });
+  try {
+    const response = await fetch(`${backendUrl}/projects/${encodeURIComponent(slug)}`, {
+      cache: "no-store",
+    });
 
-  if (response.status === 404) {
-    return null;
-  }
-  if (!response.ok) {
-    throw new Error(`Failed to fetch project: ${response.statusText}`);
-  }
+    if (response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(`Failed to fetch project: ${response.statusText}`);
+    }
 
-  const project = await response.json();
-  return mapProject(project);
+    const project = await response.json();
+    return mapProject(project);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown fetch error";
+    throw new Error(`Unable to load project from backend (${backendUrl}): ${message}`);
+  }
 }
 
 function mapProject(project: any): ProjectRecord {

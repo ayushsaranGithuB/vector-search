@@ -89,29 +89,23 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
 
     const result = await response.json();
 
-    if (result.uploadUrl && selectedFile) {
-      const uploadResponse = await fetch(result.uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/pdf",
-        },
-        body: selectedFile,
-      });
+    if (selectedFile) {
+      const formData = new FormData();
+      formData.append("file", selectedFile, selectedFile.name);
 
-      if (!uploadResponse.ok) {
-        setStatusMessage("Failed to upload PDF to Cloudflare R2.");
-        return;
-      }
-
-      const finalizeResponse = await fetch(
-        `${backendUrl}/uploads/${result.source.id}/finalize`,
+      const uploadResponse = await fetch(
+        `${backendUrl}/uploads/${result.source.id}/upload`,
         {
           method: "POST",
+          body: formData,
         },
       );
 
-      if (!finalizeResponse.ok) {
-        setStatusMessage("Failed to finalize the uploaded PDF.");
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        setStatusMessage(
+          `Failed to upload PDF to the backend: ${uploadResponse.status} ${errorText}`,
+        );
         return;
       }
     }

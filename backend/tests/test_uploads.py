@@ -3,7 +3,11 @@ from datetime import datetime
 
 from app.api.schemas import SourceUploadCreateInput
 from app.db import prisma
-from app.services.uploads import create_upload_for_project, finalize_uploaded_source
+from app.services.uploads import (
+    create_upload_for_project,
+    finalize_uploaded_source,
+    upload_source_file_to_r2,
+)
 
 
 class FakeProject:
@@ -67,6 +71,36 @@ async def test_create_upload_for_project_url(monkeypatch):
     assert result.source.name == "Test source"
     assert result.uploadUrl is None
     assert enqueued["called"] is True
+
+
+@pytest.mark.asyncio
+async def test_upload_source_file_to_r2(monkeypatch):
+    fake_source = FakePdfSource()
+    fake_source.project = FakeProject()
+    uploaded = {}
+
+    async def fake_find_unique(where, include=None):
+        return fake_source
+
+    class FakeR2Client:
+        def put_object(self, Bucket, Key, Body, ContentType):
+            uploaded["bucket"] = Bucket
+            uploaded["key"] = Key
+            uploaded["body"] = Body
+            uploaded["content_type"] = ContentType
+
+    class FakePrisma:
+        source = type("S", (), {"find_unique": staticmethod(fake_find_unique)})
+
+    monkeypatch.setattr("app.services.uploads.prisma", FakePrisma())
+    monkeypatch.setattr("app.services.uploads.get_r2_client", lambda: FakeR2Client())
+
+    await upload_source_file_to_r2("source-1", b"mock-bytes", "application/pdf", "test.pdf")
+
+    assert uploaded["bucket"] == "vector-search"
+    assert uploaded["key"].endswith("test.pdf")
+    assert uploaded["body"] == b"mock-bytes"
+    assert uploaded["content_type"] == "application/pdf"
 
 
 @pytest.mark.asyncio
