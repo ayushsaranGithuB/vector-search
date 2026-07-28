@@ -68,9 +68,15 @@ async def download_source_from_r2(object_key: str) -> bytes:
 
 async def ingest_source(source_id: str) -> None:
     logger.info("Starting ingestion for source_id=%s", source_id)
+
+    # --- Idempotency & pre-checks ---
     source = await prisma.source.find_unique(where={"id": source_id}, include={"project": True})
     if source is None:
         logger.warning("Source %s not found, skipping", source_id)
+        return
+
+    if source.status == "PROCESSED":
+        logger.info("Source %s already PROCESSED, skipping (idempotent guard)", source_id)
         return
 
     logger.info(
@@ -86,6 +92,10 @@ async def ingest_source(source_id: str) -> None:
         logger.info("URL source: %s", source.source_url)
         object_key = None
 
+    # Clean slate: delete any existing chunks + ingestion runs for this source
+    await prisma.chunk.delete_many(where={"source_id": source.id})
+    await prisma.ingestionrun.delete_many(where={"source_id": source.id})
+
     await prisma.source.update(
         where={"id": source.id},
         data={"status": "PROCESSING"},
@@ -94,6 +104,17 @@ async def ingest_source(source_id: str) -> None:
         data={"source_id": source.id, "status": "RUNNING", "started_at": datetime.utcnow()},
     )
     logger.info("Source status updated to PROCESSING")
+
+    # Periodic keepalive to prevent Neon pooler from dropping the connection
+    async def _keepalive():
+        while True:
+            await asyncio.sleep(15)
+            try:
+                await prisma.execute_raw("SELECT 1")
+            except Exception:
+                break
+
+    keepalive_task = asyncio.create_task(_keepalive())
 
     try:
         if source.source_type == "PDF" and object_key:
@@ -156,6 +177,7 @@ async def ingest_source(source_id: str) -> None:
         else:
             logger.info("Pinecone not available or no chunks, skipping vector upsert")
 
+        keepalive_task.cancel()
         await prisma.source.update(
             where={"id": source.id},
             data={
@@ -174,6 +196,7 @@ async def ingest_source(source_id: str) -> None:
         logger.info("Ingestion complete for source '%s' — %d chunks processed", source.name, len(chunks))
 
     except Exception as exc:
+        keepalive_task.cancel()
         logger.error("Ingestion failed for source '%s': %s", source.name, exc, exc_info=True)
         await prisma.source.update(
             where={"id": source.id},

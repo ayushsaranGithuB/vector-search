@@ -1,6 +1,12 @@
 ﻿"use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,6 +104,33 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     }
     setActionLoading(null);
   }
+
+  // Poll for source status updates while any source is in a non-terminal state
+  const hasActiveSources = sources.some(
+    (s) => s.status === "queued" || s.status === "processing",
+  );
+
+  const fetchSources = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${backendUrl}/projects/${project.slug}/sources`,
+        { cache: "no-store" },
+      );
+      if (response.ok) {
+        const fresh: ProjectSource[] = await response.json();
+        setSources(fresh);
+      }
+    } catch {
+      // Silently retry on next poll
+    }
+  }, [backendUrl, project.slug]);
+
+  useEffect(() => {
+    if (!hasActiveSources) return;
+
+    const interval = setInterval(fetchSources, 5000);
+    return () => clearInterval(interval);
+  }, [hasActiveSources, fetchSources]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -343,10 +376,30 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
       <div className="mt-8">
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle>Sources</CardTitle>
-            <CardDescription>
-              Track what has been added, processed, and chunked.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Sources</CardTitle>
+                <CardDescription>
+                  Track what has been added, processed, and chunked.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                {hasActiveSources && (
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                    Auto-refreshing
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchSources}
+                  disabled={hasActiveSources}
+                >
+                  {hasActiveSources ? "Auto..." : "Refresh"}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-hidden rounded-lg border border-border/60">
