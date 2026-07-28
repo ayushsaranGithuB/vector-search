@@ -1,0 +1,2 @@
+web: python -m uvicorn app.main:app --reload
+worker: python -m app.services.worker

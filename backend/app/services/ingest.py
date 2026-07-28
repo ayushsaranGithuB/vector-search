@@ -1,19 +1,20 @@
 import json
 import asyncio
 from datetime import datetime
-from io import BytesIO
 import logging
 import sys
 
 import aio_pika
 import boto3
-import httpx
 from botocore.config import Config
-from pypdf import PdfReader
 
 from app.core.config import get_settings
-from app.db import prisma, get_database_url
+from app.db import prisma
 from app.services.pinecone import embed_texts, pinecone_available, upsert_vectors
+from app.ingestion.pipeline import run_pipeline
+from app.ingestion.models import FetchResult
+from app.ingestion.normalizer import normalize_document
+from app.ingestion.chunker import chunk_document
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -36,24 +37,6 @@ def get_r2_client():
         region_name="us-east-1",
         config=Config(signature_version="s3v4"),
     )
-
-
-def extract_text_from_pdf_bytes(file_bytes: bytes) -> str:
-    try:
-        reader = PdfReader(stream=BytesIO(file_bytes))
-        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
-    except Exception:
-        return ""
-
-
-def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> list[str]:
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = min(start + chunk_size, len(text))
-        chunks.append(text[start:end].strip())
-        start += chunk_size - chunk_overlap
-    return [chunk for chunk in chunks if chunk]
 
 
 async def download_source_from_r2(object_key: str) -> bytes:
@@ -117,38 +100,64 @@ async def ingest_source(source_id: str) -> None:
     keepalive_task = asyncio.create_task(_keepalive())
 
     try:
-        if source.source_type == "PDF" and object_key:
+        if source.source_type == "URL" and source.source_url:
+            # ── Use the modular pipeline for URL sources ────────────────
+            outcome = await run_pipeline(
+                source.source_url,
+                timeout=30,
+                chunk_size=1000,
+                chunk_overlap=200,
+            )
+
+            if not outcome.success:
+                error_details = "; ".join(f"[{e.step}] {e.message}" for e in outcome.errors)
+                raise RuntimeError(f"Pipeline failed: {error_details}")
+
+            document = outcome.document
+            chunks = outcome.chunks
+            text = document.content if document else ""
+
+        elif source.source_type == "PDF" and object_key:
+            # ── PDF: download from R2, then parse + normalize + chunk ──
             logger.info("Downloading PDF from R2...")
             file_bytes = await download_source_from_r2(object_key)
             logger.info("Downloaded %d bytes from R2", len(file_bytes))
-            text = extract_text_from_pdf_bytes(file_bytes)
-            logger.info("Extracted %d characters of text from PDF", len(text))
-        elif source.source_type == "URL" and source.source_url:
-            logger.info("Fetching URL content...")
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.get(source.source_url)
-                response.raise_for_status()
-                text = response.text
-            logger.info("Fetched %d characters from URL", len(text))
+
+            # Reuse the PDF parser by constructing a minimal FetchResult
+            from app.ingestion.parsers.pdf_parser import PDFParser
+
+            fetch_result = FetchResult(
+                url=source.source_url or f"r2://{object_key}",
+                status_code=200,
+                content_type="application/pdf",
+                body=file_bytes,
+                headers={},
+                encoding="utf-8",
+            )
+            parser = PDFParser()
+            document = await parser.parse(fetch_result)
+            document = normalize_document(document)
+            text = document.content
+            chunks = chunk_document(document, chunk_size=1000, chunk_overlap=200)
         else:
             text = ""
+            chunks = []
             logger.warning("No content source found for source_id=%s", source_id)
 
-        chunks = chunk_text(text)
         logger.info("Text split into %d chunks", len(chunks))
 
         # Create all chunks in DB first
         created_chunks = []
-        for index, content in enumerate(chunks):
-            chunk = await prisma.chunk.create(
+        for chunk in chunks:
+            db_chunk = await prisma.chunk.create(
                 data={
                     "source_id": source.id,
-                    "chunk_index": index,
-                    "content": content,
-                    "token_count": len(content.split()),
+                    "chunk_index": chunk.chunk_index,
+                    "content": chunk.content,
+                    "token_count": chunk.token_count,
                 }
             )
-            created_chunks.append(chunk)
+            created_chunks.append(db_chunk)
         logger.info("Created %d chunks in database", len(created_chunks))
 
         # Batch-embed and upsert to Pinecone

@@ -60,6 +60,23 @@ What this means:
 - `-e` means editable mode, so code changes are picked up immediately
 - `.[dev]` means install the project plus the optional `dev` tools from `pyproject.toml`
 
+This installs all required packages, including:
+
+| Package | Purpose |
+|---------|---------|
+| `fastapi` | Web framework for the API |
+| `uvicorn` | ASGI server to run the app |
+| `prisma` | Type-safe database client |
+| `httpx` | Async HTTP client for URL fetching |
+| `pypdf` | PDF text extraction |
+| `pinecone` | Vector database client |
+| `aio-pika` | Async RabbitMQ client for the ingestion queue |
+| `boto3` | S3-compatible client for Cloudflare R2 |
+| `readability-lxml` | Article extraction from HTML pages |
+| `beautifulsoup4` | HTML cleaning and parsing |
+| `lxml` | XML/HTML parser (dependency of readability and BeautifulSoup) |
+| `honcho` | Run both web server and worker with one command (optional) |
+
 ### 4) Sync Prisma with Neon
 
 This backend uses Prisma Python, the shared Neon connection string stored in `backend/.env`, and `backend/prisma.config.ts` to keep the connection URL out of the schema.
@@ -81,7 +98,7 @@ If you change the schema and want to regenerate the client, run:
 Start the server with Uvicorn:
 
 ```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 What this means:
@@ -90,7 +107,23 @@ What this means:
 - `app` is the FastAPI instance inside that file
 - `--reload` restarts the server whenever you edit code
 
-### 6) Open the first endpoint
+### 6) Run both services together with honcho
+
+Instead of running the web server and worker in separate terminals, you can start both at once with `honcho`:
+
+```bash
+pip install honcho
+honcho start
+```
+
+This reads the `Procfile` and starts:
+
+- **web** → `python -m uvicorn app.main:app --reload` (the API server)
+- **worker** → `python -m app.services.worker` (the ingestion worker)
+
+Both run in the same terminal. Press **Ctrl+C** to stop them.
+
+### 7) Open the first endpoint
 
 Visit:
 
@@ -100,9 +133,9 @@ Visit:
 
 `/docs` is the auto-generated FastAPI documentation.
 
-### 7) Run the ingestion worker (separate terminal)
+### 8) Run the ingestion worker manually (separate terminal)
 
-The worker processes queued ingestion tasks (PDF chunking, embedding, Pinecone upsert):
+If you prefer to run the worker separately instead of using honcho:
 
 ```bash
 python -m app.services.worker
@@ -177,7 +210,20 @@ Pinecone vector DB client — lazy-init, batched embedding (`multilingual-e5-lar
 
 ### `app/services/ingest.py`
 
-Document ingestion pipeline — PDF text extraction (`pypdf`), URL fetching (`httpx`), text chunking (1000 chars, 200 overlap), batch embedding + Pinecone upsert, status tracking.
+Document ingestion orchestrator — receives queued messages, runs the modular pipeline for URL sources, and handles R2 PDF downloads + parsing inline. Handles status tracking, DB chunk creation, and Pinecone upsert.
+
+### `app/ingestion/` — Modular ingestion pipeline
+
+The URL ingestion pipeline uses a 4-stage architecture: **Fetcher → Parser → Normalizer → Chunker**.
+
+| Stage | File | Description |
+|-------|------|-------------|
+| Fetcher | `app/ingestion/fetcher.py` | `httpx`-based URL fetcher with structured error types (timeout, redirect, HTTP). Detects response `Content-Type`. |
+| Parser | `app/ingestion/parsers/` | Registry-based lookup by MIME type. Ships with `HTMLParser` (`readability-lxml` + `BeautifulSoup`) and `PDFParser` (`pypdf`). Add new types (DOCX, Markdown, YouTube, etc.) by creating a new parser class — no pipeline changes needed. |
+| Normalizer | `app/ingestion/normalizer.py` | Cleans extracted text — collapses blank lines, strips punctuation-only lines, normalizes Unicode whitespace. |
+| Chunker | `app/ingestion/chunker.py` | Paragraph-aware sliding window chunker (default 1000 chars, 200 overlap). Splits on paragraph boundaries first, then sentences, then exact characters. |
+| Pipeline | `app/ingestion/pipeline.py` | Orchestrates all 4 stages via `run_pipeline()`. Returns a `PipelineOutcome` with per-step error reporting. |
+| Models | `app/ingestion/models.py` | Shared data models: `Document`, `FetchResult`, `ChunkResult`, `PipelineResult`. |
 
 ### `app/services/queue.py`
 
