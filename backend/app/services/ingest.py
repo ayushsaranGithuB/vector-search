@@ -1,6 +1,9 @@
+import hashlib
 import json
 import asyncio
 from datetime import datetime
+from io import BytesIO
+import logging
 
 import boto3
 import httpx
@@ -9,8 +12,10 @@ from pypdf import PdfReader
 
 from app.core.config import get_settings
 from app.db import prisma
+from app.services.pinecone import embed_text, pinecone_available, upsert_vectors
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def get_r2_client():
@@ -63,6 +68,10 @@ async def ingest_source(source_id: str) -> None:
     elif source.source_type == "URL" and source.source_url:
         object_key = None
 
+    await prisma.source.update(
+        where={"id": source.id},
+        data={"status": "PROCESSING"},
+    )
     await prisma.ingestion_run.create(
         data={"source_id": source.id, "status": "RUNNING", "started_at": datetime.utcnow()},
     )
@@ -80,8 +89,9 @@ async def ingest_source(source_id: str) -> None:
             text = ""
 
         chunks = chunk_text(text)
+        vector_payload = []
         for index, content in enumerate(chunks):
-            await prisma.chunk.create(
+            chunk = await prisma.chunk.create(
                 data={
                     "source_id": source.id,
                     "chunk_index": index,
@@ -89,10 +99,35 @@ async def ingest_source(source_id: str) -> None:
                     "token_count": len(content.split()),
                 }
             )
+            if pinecone_available():
+                vector_payload.append(
+                    {
+                        "id": chunk.id,
+                        "values": embed_text(content),
+                        "metadata": {
+                            "source_id": source.id,
+                            "source_name": source.name,
+                            "chunk_index": index,
+                        },
+                    }
+                )
+
+        if vector_payload:
+            try:
+                await asyncio.to_thread(upsert_vectors, vector_payload, namespace=source.project.slug)
+            except Exception as exc:
+                logger.exception("Unable to upsert vectors to Pinecone")
 
         await prisma.source.update(
             where={"id": source.id},
-            data={"status": "PROCESSED", "chunk_count": len(chunks), "last_synced_at": datetime.utcnow(), "size_bytes": len(text.encode("utf-8"))},
+            data={
+                "status": "PROCESSED",
+                "chunk_count": len(chunks),
+                "chunk_size": 1000,
+                "chunk_overlap": 200,
+                "last_synced_at": datetime.utcnow(),
+                "size_bytes": len(text.encode("utf-8")),
+            },
         )
         await prisma.ingestion_run.update_many(
             where={"source_id": source.id, "status": "RUNNING"},

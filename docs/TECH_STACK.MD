@@ -36,6 +36,8 @@
   - The backend client and CLI path use `backend/prisma.config.ts` so the connection URL is not stored directly in schema.prisma
 - `Pinecone`
   - Managed vector store for semantic retrieval from day one
+  - Supports hosted-embedding indexes where the query text can be passed directly and Pinecone converts it to a vector automatically
+  - Uses namespaces for multi-project separation so one shared index can host many project embeddings safely
 - File/object storage
   - Stores raw documents and extracted content
 

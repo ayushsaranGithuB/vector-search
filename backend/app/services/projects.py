@@ -1,5 +1,6 @@
 ﻿from app.api.schemas import ProjectOut, SourceOut, SourceStatusLabel, SourceTypeLabel
 from app.db import prisma
+from app.services.pinecone import pinecone_available, query_vectors
 from app.services.queue import enqueue_ingestion_for_source
 
 
@@ -56,17 +57,33 @@ async def list_project_search_results(slug: str, query: str) -> list[dict]:
     if project is None:
         return []
 
-    chunks = await prisma.chunk.find_many(
-        where={
-            "source": {"project_id": project.id},
-            "content": {"contains": query, "mode": "insensitive"},
-        },
-        order={"updated_at": "desc"},
-        take=10,
-    )
+    chunks = []
+    if query and pinecone_available():
+        try:
+            matches = await query_vectors(query, namespace=slug)
+            chunk_ids = [chunk_id for chunk_id, score in matches]
+            if chunk_ids:
+                found_chunks = await prisma.chunk.find_many(
+                    where={"id": {"in": chunk_ids}},
+                )
+                chunk_map = {chunk.id: chunk for chunk in found_chunks}
+                ordered = [chunk_map[chunk_id] for chunk_id in chunk_ids if chunk_id in chunk_map]
+                chunks = ordered
+        except Exception:
+            chunks = []
+
+    if not chunks:
+        chunks = await prisma.chunk.find_many(
+            where={
+                "source": {"project_id": project.id},
+                "content": {"contains": query, "mode": "insensitive"},
+            },
+            order={"updated_at": "desc"},
+            take=10,
+        )
 
     results = []
-    for chunk in chunks:
+    for index, chunk in enumerate(chunks):
         source = await prisma.source.find_unique(where={"id": chunk.source_id})
         source_name = source.name if source is not None else "Unknown source"
         excerpt = chunk.content

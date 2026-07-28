@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     pinecone_index: str = Field(default="vector-search", alias="PINECONE_INDEX")
     pinecone_cloud: str = Field(default="aws", alias="PINECONE_CLOUD")
     pinecone_region: str = Field(default="us-east-1", alias="PINECONE_REGION")
+    pinecone_environment: str | None = Field(default=None, alias="PINECONE_ENVIRONMENT")
     cloudamqp_url: str = Field(default="", alias="CLOUDAMQP_URL")
     r2_access_key_id: str = Field(default="", alias="R2_ACCESS_KEY_ID")
     r2_secret_access_key: str = Field(default="", alias="R2_SECRET_ACCESS_KEY")

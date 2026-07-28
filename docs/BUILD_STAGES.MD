@@ -12,7 +12,7 @@
 - [ ] Import source documents
 - [ ] Chunk documents consistently
 - [ ] Generate embeddings
-- [ ] Support semantic search through Pinecone
+- [ ] Support semantic search through Pinecone, including hosted-embedding indexes and per-project namespaces
 - [ ] Store source metadata for filtering
 
 # Stage 3: Grounded Answers
