@@ -1,4 +1,5 @@
 ﻿from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 
 SourceTypeLabel = Literal["pdf", "url"]
 SourceStatusLabel = Literal["processed", "processing", "queued", "failed"]

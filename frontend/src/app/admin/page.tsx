@@ -2,7 +2,13 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getProjects } from "@/lib/projects";
 
 export default async function AdminPage() {
@@ -14,9 +20,12 @@ export default async function AdminPage() {
         <Badge variant="secondary" className="mb-4 w-fit px-3 py-1 text-sm">
           Admin Dashboard
         </Badge>
-        <h1 className="text-4xl font-bold tracking-tight">Global Admin Panel</h1>
+        <h1 className="text-4xl font-bold tracking-tight">
+          Global Admin Panel
+        </h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Manage projects, sources, and ingestion workflows from one central admin view.
+          Manage projects, sources, and ingestion workflows from one central
+          admin view.
         </p>
       </div>
 
@@ -33,7 +42,8 @@ export default async function AdminPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">
-                {project.sources.length} sources, ready for ingestion and retrieval.
+                {project.sources.length} sources, ready for ingestion and
+                retrieval.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link href={`/projects/${project.slug}`}>

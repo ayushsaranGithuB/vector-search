@@ -21,10 +21,14 @@ export default async function ProjectsPage() {
               <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
                 {project.status}
               </span>
-              <span className="text-xs text-muted-foreground">{project.sources.length} sources</span>
+              <span className="text-xs text-muted-foreground">
+                {project.sources.length} sources
+              </span>
             </div>
             <h2 className="text-2xl font-semibold">{project.name}</h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">{project.description}</p>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {project.description}
+            </p>
             <div className="mt-6 flex gap-3">
               <a
                 href={`/projects/${project.slug}`}

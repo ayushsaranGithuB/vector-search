@@ -2,7 +2,13 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface SearchResult {
@@ -15,38 +21,46 @@ interface SearchResult {
 }
 
 interface SearchLayoutProps {
+  projectSlug: string;
   projectName: string;
   projectDescription: string;
 }
 
-export function SearchLayout({ projectName, projectDescription }: SearchLayoutProps) {
+const backendUrl =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
+export function SearchLayout({
+  projectSlug,
+  projectName,
+  projectDescription,
+}: SearchLayoutProps) {
   const [query, setQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
 
-  function handleSearch(e: FormEvent) {
+  async function handleSearch(e: FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
 
     setIsSearching(true);
     setHasSearched(true);
 
-    // Simulate search — will be replaced with actual API call
-    setTimeout(() => {
-      setResults([
-        {
-          id: "1",
-          title: "Sample Result",
-          excerpt:
-            "This is a placeholder result showing how retrieved chunks will appear with highlighted text and citation links...",
-          source: "document-1.pdf",
-          score: 0.92,
-          citation: "§ 42.1",
-        },
-      ]);
+    const response = await fetch(
+      `${backendUrl}/projects/${encodeURIComponent(
+        projectSlug,
+      )}/search?q=${encodeURIComponent(query)}`,
+    );
+
+    if (!response.ok) {
+      setResults([]);
       setIsSearching(false);
-    }, 800);
+      return;
+    }
+
+    const data = await response.json();
+    setResults(data);
+    setIsSearching(false);
   }
 
   return (
@@ -69,7 +83,11 @@ export function SearchLayout({ projectName, projectDescription }: SearchLayoutPr
               className="flex h-12 w-full rounded-lg border border-input bg-background px-4 py-3 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
-          <Button type="submit" size="lg" disabled={isSearching || !query.trim()}>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isSearching || !query.trim()}
+          >
             {isSearching ? "Searching..." : "Search"}
           </Button>
         </div>
@@ -120,13 +138,17 @@ export function SearchLayout({ projectName, projectDescription }: SearchLayoutPr
             Found {results.length} result{results.length !== 1 ? "s" : ""}
           </p>
           {results.map((result) => (
-            <Card key={result.id} className="border-border/50 transition-colors hover:border-border">
+            <Card
+              key={result.id}
+              className="border-border/50 transition-colors hover:border-border"
+            >
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <CardTitle className="text-base">{result.title}</CardTitle>
                     <CardDescription className="mt-1">
-                      Source: {result.source} &middot; Citation: {result.citation}
+                      Source: {result.source} &middot; Citation:{" "}
+                      {result.citation}
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="shrink-0">

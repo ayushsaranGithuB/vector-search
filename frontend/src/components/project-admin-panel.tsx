@@ -4,7 +4,13 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { ProjectRecord, ProjectSource, SourceType } from "@/lib/projects";
 
@@ -32,42 +38,52 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     { totalChunks: 0, processed: 0, queued: 0, failed: 0 },
   );
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedName = name.trim();
     const trimmedValue = sourceValue.trim();
 
     if (!trimmedName || !trimmedValue) {
-      setStatusMessage("Add a source name and either a PDF file or a URL to continue.");
+      setStatusMessage(
+        "Add a source name and either a PDF file or a URL to continue.",
+      );
       return;
     }
 
-    const now = new Date();
-    const addedAt = now.toISOString().slice(0, 10);
-    const displaySource =
-      sourceType === "pdf"
-        ? selectedFileName || trimmedValue
-        : trimmedValue;
-
-    const nextSource: ProjectSource = {
-      id: `local-${Date.now()}`,
+    const payload = {
       name: trimmedName,
       type: sourceType,
-      source: displaySource,
-      addedAt,
-      size: sourceType === "pdf" ? "Pending upload" : "Pending fetch",
-      chunks: 0,
-      status: "queued",
-      lastSynced: "Queued for ingestion",
+      source: trimmedValue,
+      notes,
     };
 
-    setSources((current) => [nextSource, ...current]);
+    const response = await fetch(
+      `${
+        process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000"
+      }/projects/${encodeURIComponent(project.slug)}/sources`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!response.ok) {
+      setStatusMessage(`Failed to add source: ${response.statusText}`);
+      return;
+    }
+
+    const createdSource = await response.json();
+
+    setSources((current) => [createdSource, ...current]);
     setName("");
     setSourceValue("");
     setNotes("");
     setSelectedFileName("");
-    setStatusMessage(`${trimmedName} was added locally and is waiting for ingestion.`);
+    setStatusMessage(`${trimmedName} was queued for ingestion.`);
   }
 
   return (
@@ -78,7 +94,9 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
             Project Admin
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight">{project.name}</h1>
-          <p className="mt-3 max-w-2xl text-lg text-muted-foreground">{project.description}</p>
+          <p className="mt-3 max-w-2xl text-lg text-muted-foreground">
+            {project.description}
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Link href="/projects">
@@ -92,7 +110,9 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle>Project Stats</CardTitle>
-            <CardDescription>Source coverage and ingestion summary.</CardDescription>
+            <CardDescription>
+              Source coverage and ingestion summary.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <StatRow label="Sources" value={String(sources.length)} />
@@ -107,8 +127,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
           <CardHeader>
             <CardTitle>Add Source</CardTitle>
             <CardDescription>
-              Add a PDF or a URL now. This form is local-only for the scaffold and will connect to
-              the backend ingestion API next.
+              Add a PDF or a URL directly to the backend ingestion workflow.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -158,7 +177,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    The backend will later upload and extract text from this PDF.
+                    The backend will upload and extract text from this PDF.
                   </p>
                 </div>
               ) : (
@@ -173,7 +192,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                     placeholder="https://example.com/source"
                   />
                   <p className="text-xs text-muted-foreground">
-                    The backend will later fetch and ingest this URL.
+                    The backend will fetch and ingest this URL.
                   </p>
                 </div>
               )}
@@ -212,8 +231,8 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                 <p className="text-sm text-muted-foreground">{statusMessage}</p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Source metadata will later be stored in managed Postgres, while embeddings go to
-                  Pinecone.
+                  Source metadata will later be stored in managed Postgres,
+                  while embeddings go to Pinecone.
                 </p>
               )}
             </form>
@@ -225,7 +244,9 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle>Sources</CardTitle>
-            <CardDescription>Track what has been added, processed, and chunked.</CardDescription>
+            <CardDescription>
+              Track what has been added, processed, and chunked.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-hidden rounded-lg border border-border/60">
@@ -240,19 +261,30 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
               </div>
               <div className="divide-y divide-border">
                 {sources.map((source) => (
-                  <div key={source.id} className="grid grid-cols-7 gap-4 px-4 py-4 text-sm">
+                  <div
+                    key={source.id}
+                    className="grid grid-cols-7 gap-4 px-4 py-4 text-sm"
+                  >
                     <div className="col-span-2">
                       <p className="font-medium">{source.name}</p>
                       <p className="text-muted-foreground">{source.source}</p>
                     </div>
-                    <div className="capitalize text-muted-foreground">{source.type}</div>
-                    <div>
-                      <Badge variant={badgeVariantForStatus(source.status)}>{source.status}</Badge>
+                    <div className="capitalize text-muted-foreground">
+                      {source.type}
                     </div>
-                    <div className="text-muted-foreground">{source.addedAt}</div>
+                    <div>
+                      <Badge variant={badgeVariantForStatus(source.status)}>
+                        {source.status}
+                      </Badge>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {source.addedAt}
+                    </div>
                     <div className="text-muted-foreground">{source.size}</div>
                     <div className="text-muted-foreground">{source.chunks}</div>
-                    <div className="text-muted-foreground">{source.lastSynced}</div>
+                    <div className="text-muted-foreground">
+                      {source.lastSynced}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -1,6 +1,7 @@
 import "server-only";
 
 export type SourceTypeLabel = "pdf" | "url";
+export type SourceType = SourceTypeLabel;
 export type SourceStatusLabel = "processed" | "processing" | "queued" | "failed";
 
 export interface ProjectSource {

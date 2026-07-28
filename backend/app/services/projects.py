@@ -1,4 +1,4 @@
-﻿from app.api.schemas import ProjectOut, ProjectStatusLabel, SourceOut, SourceStatusLabel, SourceTypeLabel
+﻿from app.api.schemas import ProjectOut, SourceOut, SourceStatusLabel, SourceTypeLabel
 from app.db import prisma
 
 
@@ -44,6 +44,48 @@ async def create_source_for_project(slug: str, payload) -> SourceOut:
         }
     )
     return map_source(source)
+
+
+async def list_project_search_results(slug: str, query: str) -> list[dict]:
+    project = await prisma.project.find_unique(where={"slug": slug})
+    if project is None:
+        return []
+
+    chunks = await prisma.chunk.find_many(
+        where={
+            "source": {"project_id": project.id},
+            "content": {"contains": query, "mode": "insensitive"},
+        },
+        order={"updated_at": "desc"},
+        take=10,
+    )
+
+    results = []
+    for chunk in chunks:
+        source = await prisma.source.find_unique(where={"id": chunk.source_id})
+        source_name = source.name if source is not None else "Unknown source"
+        excerpt = chunk.content
+        if query:
+            lower_query = query.lower()
+            lower_content = chunk.content.lower()
+            position = lower_content.find(lower_query)
+            if position != -1:
+                start = max(0, position - 100)
+                end = min(len(chunk.content), position + 100)
+                excerpt = f"...{chunk.content[start:end].strip()}..."
+
+        results.append(
+            {
+                "id": chunk.id,
+                "title": source_name,
+                "excerpt": excerpt,
+                "source": source_name,
+                "score": 1.0,
+                "citation": f"chunk {chunk.chunk_index}",
+            }
+        )
+
+    return results
 
 
 def map_project(project) -> ProjectOut:

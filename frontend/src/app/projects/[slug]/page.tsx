@@ -18,6 +18,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   return (
     <SearchLayout
+      projectSlug={slug}
       projectName={project.name}
       projectDescription={project.description}
     />
