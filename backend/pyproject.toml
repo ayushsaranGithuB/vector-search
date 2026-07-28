@@ -10,6 +10,7 @@ dependencies = [
   "pydantic-settings>=2.10.0",
   "python-dotenv>=1.1.1",
   "prisma",
+  "boto3>=1.28.0",
 ]
 
 [project.optional-dependencies]

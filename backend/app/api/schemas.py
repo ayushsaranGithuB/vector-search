@@ -21,6 +21,15 @@ class SourceCreateInput(BaseModel):
     notes: str | None = None
 
 
+class SourceUploadCreateInput(BaseModel):
+    project: str
+    name: str
+    type: SourceTypeLabel
+    source: str | None = None
+    file_name: str | None = None
+    notes: str | None = None
+
+
 class SourceOut(BaseModel):
     id: str
     name: str
@@ -31,6 +40,12 @@ class SourceOut(BaseModel):
     chunks: int
     status: SourceStatusLabel
     lastSynced: str
+
+
+class UploadCreateOut(BaseModel):
+    source: SourceOut
+    uploadUrl: str | None = None
+    r2ObjectKey: str | None = None
 
 
 class ProjectOut(BaseModel):

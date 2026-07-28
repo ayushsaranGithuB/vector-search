@@ -1,5 +1,6 @@
 ﻿from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,6 +23,22 @@ class Settings(BaseSettings):
     pinecone_index: str = Field(default="vector-search", alias="PINECONE_INDEX")
     pinecone_cloud: str = Field(default="aws", alias="PINECONE_CLOUD")
     pinecone_region: str = Field(default="us-east-1", alias="PINECONE_REGION")
+    cloudamqp_url: str = Field(default="", alias="CLOUDAMQP_URL")
+    r2_access_key_id: str = Field(default="", alias="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: str = Field(default="", alias="R2_SECRET_ACCESS_KEY")
+    r2_bucket_name: str = Field(default="", alias="R2_BUCKET_NAME")
+    r2_account_id: str = Field(default="", alias="R2_ACCOUNT_ID")
+    r2_endpoint: str | None = Field(default=None, alias="R2_ENDPOINT")
+    s3_api_endpoint: str | None = Field(default=None, alias="S3_API_ENDPOINT")
+
+    @property
+    def r2_base_endpoint(self) -> str:
+        if self.r2_endpoint:
+            return self.r2_endpoint
+        if self.s3_api_endpoint:
+            parsed = urlparse(self.s3_api_endpoint)
+            return f"{parsed.scheme}://{parsed.hostname}"
+        return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,10 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
   const [name, setName] = useState("");
   const [sourceValue, setSourceValue] = useState("");
   const [notes, setNotes] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const totals = sources.reduce(
     (acc, source) => {
@@ -44,46 +46,77 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     const trimmedName = name.trim();
     const trimmedValue = sourceValue.trim();
 
-    if (!trimmedName || !trimmedValue) {
-      setStatusMessage(
-        "Add a source name and either a PDF file or a URL to continue.",
-      );
+    if (!trimmedName) {
+      setStatusMessage("Add a source name to continue.");
       return;
     }
 
+    if (sourceType === "pdf" && !selectedFile) {
+      setStatusMessage("Choose a PDF file before submitting.");
+      return;
+    }
+
+    if (sourceType === "url" && !trimmedValue) {
+      setStatusMessage("Enter a URL before submitting.");
+      return;
+    }
+
+    setStatusMessage("Creating source and preparing upload...");
+
     const payload = {
+      project: project.slug,
       name: trimmedName,
       type: sourceType,
-      source: trimmedValue,
+      source: sourceType === "url" ? trimmedValue : undefined,
+      file_name: sourceType === "pdf" ? selectedFileName : undefined,
       notes,
     };
 
-    const response = await fetch(
-      `${
-        process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000"
-      }/projects/${encodeURIComponent(project.slug)}/sources`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+    const response = await fetch(`${backendUrl}/uploads`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify(payload),
+    });
 
     if (!response.ok) {
       setStatusMessage(`Failed to add source: ${response.statusText}`);
       return;
     }
 
-    const createdSource = await response.json();
+    const result = await response.json();
 
-    setSources((current) => [createdSource, ...current]);
+    if (result.uploadUrl && selectedFile) {
+      const uploadResponse = await fetch(result.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/pdf",
+        },
+        body: selectedFile,
+      });
+
+      if (!uploadResponse.ok) {
+        setStatusMessage("Failed to upload PDF to Cloudflare R2.");
+        return;
+      }
+    }
+
+    setSources((current) => [result.source, ...current]);
     setName("");
     setSourceValue("");
     setNotes("");
+    setSelectedFile(null);
     setSelectedFileName("");
-    setStatusMessage(`${trimmedName} was queued for ingestion.`);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setStatusMessage(
+      sourceType === "pdf"
+        ? `${trimmedName} was queued and uploaded to R2.`
+        : `${trimmedName} was queued for ingestion.`,
+    );
   }
 
   return (
@@ -170,14 +203,16 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                     id="source-file"
                     type="file"
                     accept="application/pdf"
+                    ref={fileInputRef}
                     onChange={(event) => {
-                      const file = event.target.files?.[0];
+                      const file = event.target.files?.[0] ?? null;
+                      setSelectedFile(file);
                       setSelectedFileName(file?.name ?? "");
-                      setSourceValue(file?.name ?? "");
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    The backend will upload and extract text from this PDF.
+                    The browser uploads the PDF directly to R2 after the backend
+                    creates the source and returns the signed URL.
                   </p>
                 </div>
               ) : (
