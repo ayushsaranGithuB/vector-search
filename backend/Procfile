@@ -1,2 +1,2 @@
-web: python -m uvicorn app.main:app --reload
-worker: python -m app.services.worker
+web: python -u check_port.py 8000 && python -u -m uvicorn app.main:app --reload
+worker: python -u -m app.services.worker

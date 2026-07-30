@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useRef, Suspense, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,12 +41,25 @@ interface SearchLayoutProps {
 const backendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
-export function SearchLayout({
+export function SearchLayout(props: SearchLayoutProps) {
+  return (
+    <Suspense
+      fallback={<div className="mx-auto max-w-4xl px-6 py-12 lg:px-8" />}
+    >
+      <SearchLayoutInner {...props} />
+    </Suspense>
+  );
+}
+
+function SearchLayoutInner({
   projectSlug,
   projectName,
   projectDescription,
 }: SearchLayoutProps) {
-  const [query, setQuery] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get("search") ?? "");
+  const initialized = useRef(false);
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -113,6 +127,11 @@ export function SearchLayout({
     setResults(data);
     setIsSearching(false);
 
+    // Update URL with search term (replace to avoid stacking history entries)
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("search", query);
+    router.replace(`?${params.toString()}`, { scroll: false });
+
     // Auto-generate AI summary
     if (data.length > 0) {
       setIsSummarizing(true);
@@ -133,6 +152,50 @@ export function SearchLayout({
       }
     }
   }
+
+  // Sync search query to URL on mount (for shareable links)
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    const urlSearch = searchParams.get("search");
+    if (urlSearch) {
+      // Trigger search on mount if a search param is present
+      const run = async () => {
+        setIsSearching(true);
+        setHasSearched(true);
+
+        const response = await fetch(
+          `${backendUrl}/projects/${encodeURIComponent(
+            projectSlug,
+          )}/search?q=${encodeURIComponent(urlSearch)}`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data);
+
+          if (data.length > 0) {
+            setIsSummarizing(true);
+            try {
+              const sr = await fetch(
+                `${backendUrl}/projects/${encodeURIComponent(
+                  projectSlug,
+                )}/search/summary?q=${encodeURIComponent(urlSearch)}`,
+              );
+              if (sr.ok) {
+                setSummary(await sr.json());
+              }
+            } catch (_) {
+            } finally {
+              setIsSummarizing(false);
+            }
+          }
+        }
+        setIsSearching(false);
+      };
+      run();
+    }
+  }, [initialized, searchParams, projectSlug, backendUrl]);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12 lg:px-8">
@@ -263,7 +326,8 @@ export function SearchLayout({
                   <div>
                     <CardTitle className="text-sm">AI Summary</CardTitle>
                     <CardDescription className="text-xs">
-                      Generated from {summary.generated_from} results
+                      Generated from {summary.generated_from} source
+                      {summary.generated_from !== 1 ? "s" : ""}
                     </CardDescription>
                   </div>
                   <Badge variant="secondary" className="text-xs">

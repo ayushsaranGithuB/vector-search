@@ -1,8 +1,9 @@
 # Next Up
 
 - [x] LLM-powered grounded answers (generate natural language answers from retrieved chunks)
+- [x] Fix infinite retry loop on ingestion failure (ack/reject instead of re-raise)
+- [ ] fix typos in user search query like: learners lisense -> learner's license
 - [ ] Reranking pipeline for improved result quality
 - [ ] Query analytics and observability dashboard
 - [ ] Populate `pinecone_vector_id` on chunks after upsert
-- [ ] Fix infinite retry loop on ingestion failure (ack/reject instead of re-raise)
 - [ ] Wire up "Sync Sources" button in admin panel

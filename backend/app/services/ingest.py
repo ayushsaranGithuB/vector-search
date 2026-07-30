@@ -15,6 +15,7 @@ from app.ingestion.pipeline import run_pipeline
 from app.ingestion.models import FetchResult
 from app.ingestion.normalizer import normalize_document
 from app.ingestion.chunker import chunk_document
+from app.services.storage import build_r2_object_key
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ async def ingest_source(source_id: str) -> None:
 
     object_key = None
     if source.source_type == "PDF" and source.file_name:
-        object_key = f"projects/{source.project.slug}/sources/{source.id}/{source.file_name}"
+        object_key = build_r2_object_key(source.project.slug, source.id, source.file_name)
         logger.info("R2 object key: %s", object_key)
     elif source.source_type == "URL" and source.source_url:
         logger.info("URL source: %s", source.source_url)
@@ -95,7 +96,14 @@ async def ingest_source(source_id: str) -> None:
             try:
                 await prisma.execute_raw("SELECT 1")
             except Exception:
-                break
+                logger.warning("Ingestion keepalive failed, attempting reconnect...", exc_info=True)
+                try:
+                    await prisma.disconnect()
+                    await prisma.connect()
+                    logger.info("Ingestion keepalive reconnected successfully")
+                except Exception as reconnect_error:
+                    logger.error("Ingestion keepalive reconnect failed: %s", reconnect_error)
+                    # Don't break — keep retrying on next cycle
 
     keepalive_task = asyncio.create_task(_keepalive())
 
@@ -235,4 +243,10 @@ async def consume_ingestion_queue() -> None:
                     source_id = payload.get("source_id")
                     logger.info("Received ingestion message for source_id=%s", source_id)
                     if source_id:
-                        await ingest_source(source_id)
+                        try:
+                            await ingest_source(source_id)
+                        except Exception:
+                            logger.exception(
+                                "Ingestion failed for source_id=%s — message acknowledged (won't retry)",
+                                source_id,
+                            )

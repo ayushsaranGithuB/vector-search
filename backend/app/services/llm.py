@@ -76,20 +76,36 @@ Rules:
 
 
 def build_context(results: list[dict[str, Any]]) -> str:
-    """Build a numbered context block from search results for the LLM."""
-    parts = []
-    for i, result in enumerate(results, start=1):
-        title = result.get("title", "Untitled")
-        excerpt = result.get("excerpt", "")
+    """Build a numbered context block from search results for the LLM.
+
+    Groups chunks by source so each unique source gets one citation number,
+    preventing the LLM from treating every chunk as a distinct source.
+    """
+    # Group results by source name
+    from collections import OrderedDict
+
+    grouped: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    for result in results:
         source = result.get("source", "Unknown")
-        citation = result.get("citation", "")
-        source_url = result.get("source_url") or ""
+        if source not in grouped:
+            grouped[source] = {
+                "title": result.get("title", "Untitled"),
+                "source": source,
+                "citation": result.get("citation", ""),
+                "source_url": result.get("source_url") or "",
+                "excerpts": [],
+            }
+        grouped[source]["excerpts"].append(result.get("excerpt", ""))
+
+    parts = []
+    for i, (source_name, entry) in enumerate(grouped.items(), start=1):
+        merged_content = "\n\n".join(entry["excerpts"])
         parts.append(
-            f"[{i}] Title: {title}\n"
-            f"    Source: {source}\n"
-            f"    Citation: {citation}\n"
-            f"    URL: {source_url}\n"
-            f"    Content: {excerpt}\n"
+            f"[{i}] Title: {entry['title']}\n"
+            f"    Source: {entry['source']}\n"
+            f"    Citation: {entry['citation']}\n"
+            f"    URL: {entry['source_url']}\n"
+            f"    Content: {merged_content}\n"
         )
     return "\n---\n".join(parts)
 
@@ -117,7 +133,7 @@ Answer using only the search results.
 - Start the answer with a brief summary of the findings, then provide a detailed answer with citations.
 
 Example: "According to the Motor Vehicles Act 1989, heavy vehicles are defined as.......
- 
+
 """
     return [
         {"role": "system", "content": SYSTEM_PROMPT},

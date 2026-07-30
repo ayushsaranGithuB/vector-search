@@ -285,13 +285,16 @@ async def summarize_search_results(
     effective_slug = model_slug if model_slug in MODEL_REGISTRY else next(iter(MODEL_REGISTRY))
     model_info = MODEL_REGISTRY[effective_slug]
 
+    # Count unique sources for the generated_from display
+    unique_sources = len({r["source"] for r in results})
+
     summary = await generate_summary(query, results, model_slug=effective_slug)
     if summary is None:
         raise ValueError("Failed to generate summary — check that OPENROUTER_API_KEY is configured")
 
     return SearchSummaryOut(
         summary=summary,
-        generated_from=len(results),
+        generated_from=unique_sources,
         model_slug=effective_slug,
         model_label=model_info["label"],
     )
