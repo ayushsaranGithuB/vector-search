@@ -26,14 +26,19 @@ settings = get_settings()
 # /search/summary endpoint's model parameter.
 
 MODEL_REGISTRY: dict[str, dict[str, str]] = {
-    "qwen-3-8b": {
-        "id": "qwen/qwen3-8b",
-        "label": "Qwen 3 8B",
+    "qwen-3.7-flash": {
+        "id": "qwen/qwen3.7-flash",
+        "label": "Qwen 3.7 Flash",
     },
-    "gemini-flash-lite": {
-        "id": "google/gemini-2.5-flash-lite",
-        "label": "Gemini Flash Lite 2.5",
-    },
+    # ── Archived models (re-enable for comparison mode) ──
+    # "qwen-3-8b": {
+    #     "id": "qwen/qwen3-8b",
+    #     "label": "Qwen 3 8B",
+    # },
+    # "gemini-flash-lite": {
+    #     "id": "google/gemini-2.5-flash-lite",
+    #     "label": "Gemini Flash Lite 2.5",
+    # },
 }
 
 
@@ -109,6 +114,10 @@ Answer using only the search results.
 - Example of WRONG format (do not do this): "Drivers must be at least 18 years old [1] and pass a test [3]."
 - Group related information together.
 - Return Markdown only.
+- Start the answer with a brief summary of the findings, then provide a detailed answer with citations.
+
+Example: "According to the Motor Vehicles Act 1989, heavy vehicles are defined as.......
+ 
 """
     return [
         {"role": "system", "content": SYSTEM_PROMPT},

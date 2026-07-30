@@ -9,6 +9,7 @@ from app.api.schemas import (
     SourceCreateInput,
     SourceOut,
 )
+from app.core.config import get_settings
 from app.services.llm import list_models as llm_list_models
 from app.services.projects import (
     compare_search_summaries,
@@ -68,10 +69,16 @@ async def search_project_summary(
 async def compare_project_summaries(
     slug: str,
     q: str,
-    model_a: str = Query(default="qwen-3-8b", description="First model slug"),
-    model_b: str = Query(default="gemini-flash-lite", description="Second model slug"),
+    model_a: str = Query(default="qwen-3.7-flash", description="First model slug"),
+    model_b: str = Query(default="qwen-3.7-flash", description="Second model slug"),
 ) -> ComparisonSummaryOut:
     """Generate summaries from two models side-by-side for comparison."""
+    settings = get_settings()
+    if not settings.enable_comparison:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comparison mode is not enabled. Set ENABLE_COMPARISON=true to use this feature.",
+        )
     try:
         return await compare_search_summaries(slug, q, model_a, model_b)
     except ValueError as exc:

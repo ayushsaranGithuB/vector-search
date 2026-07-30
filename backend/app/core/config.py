@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     r2_endpoint: str | None = Field(default=None, alias="R2_ENDPOINT")
     s3_api_endpoint: str | None = Field(default=None, alias="S3_API_ENDPOINT")
     r2_public_url: str = Field(default="", alias="R2_PUBLIC_URL")
+    enable_comparison: bool = Field(default=False, alias="ENABLE_COMPARISON")
 
     @property
     def r2_base_endpoint(self) -> str:
