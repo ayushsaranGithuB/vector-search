@@ -94,6 +94,7 @@
     @apply bg-background text-foreground;
     background-image: url('/images/15204.webp');
     background-size: cover;
+    background-repeat: no-repeat;
   }
 
   html {
