@@ -20,6 +20,9 @@ from app.services.storage import build_r2_object_key
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+# Ensure stdout is line-buffered even when piped (e.g. under Honcho)
+sys.stdout.reconfigure(line_buffering=True)
+
 # Ensure the logger actually prints to stdout
 if not logger.handlers:
     handler = logging.StreamHandler(sys.stdout)

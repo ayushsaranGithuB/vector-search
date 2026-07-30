@@ -14,6 +14,7 @@ class SearchResultOut(BaseModel):
     source_url: str | None = None  # link to original document (URL or R2 PDF)
     score: float
     citation: str
+    corrected_query: str | None = None  # typo-corrected version of the user's query
 
 
 class SearchSummaryOut(BaseModel):

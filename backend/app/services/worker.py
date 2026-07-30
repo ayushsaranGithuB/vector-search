@@ -32,6 +32,9 @@ async def _db_keepalive():
 
 
 async def main() -> None:
+    # Ensure stdout is line-buffered even when piped (e.g. under Honcho)
+    sys.stdout.reconfigure(line_buffering=True)
+
     logger.info("=" * 60)
     logger.info("Ingestion Worker starting up")
     logger.info("=" * 60)

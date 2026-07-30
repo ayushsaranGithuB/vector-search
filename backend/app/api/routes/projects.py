@@ -20,6 +20,7 @@ from app.services.projects import (
     list_sources_for_project,
     summarize_search_results,
 )
+from app.services.query_normalizer import correct_query
 
 router = APIRouter(prefix="/projects")
 
@@ -44,7 +45,13 @@ async def read_project_sources(slug: str) -> list[SourceOut]:
 
 @router.get("/{slug}/search", response_model=list[SearchResultOut])
 async def search_project(slug: str, q: str) -> list[SearchResultOut]:
-    return await list_project_search_results(slug, q)
+    corrected_q = correct_query(q)
+    results = await list_project_search_results(slug, corrected_q)
+    # Attach the corrected query so the frontend can highlight using
+    # the corrected terms rather than the original misspelled ones.
+    for r in results:
+        r["corrected_query"] = corrected_q if corrected_q != q else None
+    return results
 
 
 @router.get("/{slug}/search/models", response_model=list[ModelInfo])
@@ -60,7 +67,8 @@ async def search_project_summary(
     model: str = Query(default="", description="Model slug (e.g. qwen-3-8b, gemini-flash-lite)"),
 ) -> SearchSummaryOut:
     try:
-        return await summarize_search_results(slug, q, model_slug=model or None)
+        corrected_q = correct_query(q)
+        return await summarize_search_results(slug, corrected_q, model_slug=model or None)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -80,7 +88,8 @@ async def compare_project_summaries(
             detail="Comparison mode is not enabled. Set ENABLE_COMPARISON=true to use this feature.",
         )
     try:
-        return await compare_search_summaries(slug, q, model_a, model_b)
+        corrected_q = correct_query(q)
+        return await compare_search_summaries(slug, corrected_q, model_a, model_b)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

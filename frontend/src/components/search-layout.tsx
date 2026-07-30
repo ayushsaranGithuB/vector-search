@@ -23,6 +23,7 @@ interface SearchResult {
   source_url: string | null;
   score: number;
   citation: string;
+  corrected_query: string | null;
 }
 
 interface SearchSummary {
@@ -40,6 +41,109 @@ interface SearchLayoutProps {
 
 const backendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
+/** Common English stop words to skip when highlighting search matches. */
+const STOP_WORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "nor",
+  "so",
+  "for",
+  "yet",
+  "is",
+  "am",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "having",
+  "do",
+  "does",
+  "did",
+  "doing",
+  "will",
+  "would",
+  "shall",
+  "should",
+  "can",
+  "could",
+  "may",
+  "might",
+  "must",
+  "i",
+  "me",
+  "my",
+  "we",
+  "us",
+  "our",
+  "you",
+  "your",
+  "he",
+  "she",
+  "it",
+  "they",
+  "them",
+  "this",
+  "that",
+  "these",
+  "those",
+  "at",
+  "by",
+  "in",
+  "of",
+  "on",
+  "to",
+  "with",
+  "from",
+  "about",
+  "into",
+  "through",
+  "during",
+  "before",
+  "after",
+  "above",
+  "below",
+  "between",
+  "up",
+  "down",
+  "out",
+  "off",
+  "over",
+  "under",
+  "if",
+  "then",
+  "else",
+  "when",
+  "where",
+  "why",
+  "how",
+  "all",
+  "each",
+  "every",
+  "both",
+  "few",
+  "more",
+  "most",
+  "other",
+  "some",
+  "such",
+  "no",
+  "not",
+  "only",
+  "very",
+  "just",
+  "too",
+  "also",
+]);
 
 export function SearchLayout(props: SearchLayoutProps) {
   return (
@@ -67,7 +171,13 @@ function SearchLayoutInner({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [expandedSource, setExpandedSource] = useState<string | null>(null);
 
-  /** Highlight matching terms in text */
+  // Use the corrected query for highlighting when the backend fixed typos
+  const highlightQuery =
+    results.length > 0 && results[0].corrected_query
+      ? results[0].corrected_query
+      : query;
+
+  /** Highlight matching terms in text, skipping common stop words. */
   function highlightMatches(
     text: string,
     searchQuery: string,
@@ -78,6 +188,8 @@ function SearchLayoutInner({
       .trim()
       .split(/\s+/)
       .filter((t) => t.length > 0)
+      // Skip stop words — they produce noisy highlights
+      .filter((t) => !STOP_WORDS.has(t.toLowerCase()))
       .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
     if (terms.length === 0) return text;
@@ -300,6 +412,14 @@ function SearchLayoutInner({
             </p>
           </div>
 
+          {/* Typo correction notice */}
+          {results[0]?.corrected_query && (
+            <p className="text-sm text-muted-foreground italic">
+              Showing results for:{" "}
+              <span className="font-medium">{results[0].corrected_query}</span>
+            </p>
+          )}
+
           {/* AI Summary */}
           {isSummarizing && (
             <Card className="border-primary/20 bg-primary/5">
@@ -405,7 +525,7 @@ function SearchLayoutInner({
                           ) : (
                             <Link className="h-4 w-4 text-muted-foreground shrink-0" />
                           )}
-                          {highlightMatches(sourceName, query)}
+                          {highlightMatches(sourceName, highlightQuery)}
                         </CardTitle>
                         <CardDescription className="mt-1">
                           Source:{" "}
@@ -463,7 +583,7 @@ function SearchLayoutInner({
                             </span>
                           </div>
                           <p className="text-sm text-muted-foreground leading-relaxed">
-                            {highlightMatches(chunk.excerpt, query)}
+                            {highlightMatches(chunk.excerpt, highlightQuery)}
                           </p>
                         </div>
                       ))}

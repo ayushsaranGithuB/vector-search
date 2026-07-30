@@ -2,7 +2,8 @@
 
 - [x] LLM-powered grounded answers (generate natural language answers from retrieved chunks)
 - [x] Fix infinite retry loop on ingestion failure (ack/reject instead of re-raise)
-- [ ] fix typos in user search query like: learners lisense -> learner's license
+- [x] fix typos in user search query like: learners lisense -> learner's license
+- [x] skip common words in search highlighting like "a, of, the, why, when..." etc
 - [ ] Reranking pipeline for improved result quality
 - [ ] Query analytics and observability dashboard
 - [ ] Populate `pinecone_vector_id` on chunks after upsert
