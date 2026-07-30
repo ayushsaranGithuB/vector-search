@@ -8,15 +8,18 @@ import {
 } from "@/components/ui/card";
 import {
   ArrowRight,
-  BookOpen,
   BrainCircuit,
   Cloud,
   Database,
   FileText,
-  GitBranch,
   Search,
   ShieldCheck,
   Workflow,
+  BarChart3,
+  Layers,
+  Form,
+  Route,
+  Eye,
 } from "lucide-react";
 
 const howItWorks = [
@@ -49,6 +52,45 @@ const howItWorks = [
     description:
       "Each result includes the chunk content, its source document name, a relevance score, and a citation link. The frontend displays everything in a clean card layout so users can inspect exactly why each result was returned.",
     icon: <ShieldCheck size={20} />,
+  },
+];
+
+const coreCapabilities = [
+  {
+    title: "Grounded Answers",
+    description:
+      "Answers backed by source citations with highlighted retrieved text.",
+    lucideIcon: <Route size={18} />,
+  },
+  {
+    title: "Hybrid Search",
+    description:
+      "Keyword, vector, and hybrid retrieval combined for the best results.",
+    lucideIcon: <Search size={18} />,
+  },
+  {
+    title: "Full Observability",
+    description:
+      "Cosine similarity scores, rerank scores, and latency for each pipeline stage.",
+    lucideIcon: <BarChart3 size={18} />,
+  },
+  {
+    title: "Citation Inspection",
+    description:
+      "Flag unsupported claims when an answer is not backed by citations.",
+    lucideIcon: <Eye size={18} />,
+  },
+  {
+    title: "Embedding Visualisation",
+    description:
+      "Visualise embeddings with UMAP or t-SNE to understand your data.",
+    lucideIcon: <Layers size={18} />,
+  },
+  {
+    title: "Multi-Project SaaS",
+    description:
+      "Each project is a separate searchable workspace with its own sources and settings.",
+    lucideIcon: <Form size={18} />,
   },
 ];
 
@@ -118,6 +160,72 @@ const techStack = [
       },
     ],
     icon: <Database size={18} />,
+  },
+  {
+    title: "Retrieval Pipeline",
+    items: [
+      {
+        label: "Chunking Pipeline",
+        why: "Splits documents into overlapping 1000-character chunks (200 overlap) for precise retrieval while preserving context across boundaries.",
+      },
+      {
+        label: "Keyword Search",
+        why: "PostgreSQL CONTAINS fallback catches exact matches (part numbers, legal citations, proper names) that vector search can miss.",
+      },
+      {
+        label: "Vector Search",
+        why: "Pinecone ANN search over multilingual-e5-large embeddings for semantic understanding across languages.",
+      },
+      {
+        label: "Hybrid Retrieval",
+        why: "Merges keyword and vector results into a single ranked list, combining the strengths of both approaches.",
+      },
+      {
+        label: "Reranking",
+        why: "Improves result quality by re-scoring initial candidates with a cross-encoder model for more precise relevance.",
+      },
+    ],
+    icon: <Search size={18} />,
+  },
+  {
+    title: "AI & Models",
+    items: [
+      {
+        label: "Embeddings Model (multilingual-e5-large)",
+        why: "Pinecone's hosted model generates 1024-dim vectors from plain text — no separate embedding infrastructure needed.",
+      },
+      {
+        label: "LLM for Generation (Qwen 3.7 Flash)",
+        why: "OpenRouter-hosted model generates grounded answers with citations from retrieved chunks.",
+      },
+      {
+        label: "Reranking Model",
+        why: "Cross-encoder model re-ranks initial search results for better precision at the top of the list.",
+      },
+    ],
+    icon: <BrainCircuit size={18} />,
+  },
+  {
+    title: "Observability",
+    items: [
+      {
+        label: "Retrieval Traces",
+        why: "End-to-end tracing of each query through the pipeline — embedding, search, rerank, generation — for debugging and optimization.",
+      },
+      {
+        label: "Query Analytics",
+        why: "Aggregated metrics on query volume, latency, and result quality across all projects.",
+      },
+      {
+        label: "Evaluation Datasets",
+        why: "Curated test queries with expected results for measuring retrieval quality and tracking regressions.",
+      },
+      {
+        label: "Citation Inspection",
+        why: "Tooling to verify that generated answers are properly grounded in retrieved sources, flagging unsupported claims.",
+      },
+    ],
+    icon: <BarChart3 size={18} />,
   },
 ];
 
@@ -201,6 +309,43 @@ export default function DocsPage() {
                   </CardContent>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Core Capabilities */}
+      <section className="border-t border-border bg-muted/30">
+        <div className="mx-auto max-w-6xl px-6 py-24 sm:py-32 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-4xl font-bold tracking-tight">
+              Core Capabilities
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Modern vector search systems should work in practice - here is
+              what this platform delivers.
+            </p>
+          </div>
+          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {coreCapabilities.map((capability) => (
+              <Card
+                key={capability.title}
+                className="border-border/50 transition-colors hover:border-border px-3 py-6"
+              >
+                <CardHeader>
+                  <CardTitle className="text-xl flex gap-2 items-center">
+                    {capability.lucideIcon && (
+                      <span className="text-sm">{capability.lucideIcon}</span>
+                    )}
+                    {capability.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="text-sm leading-relaxed">
+                    {capability.description}
+                  </CardDescription>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>

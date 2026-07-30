@@ -6,12 +6,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BowArrow } from "lucide-react";
 
-const navLinks = [
-  { href: "/", label: "Home" },
-  { href: "/projects/motor-vehicle-rules", label: "Demo" },
-  { href: "/docs", label: "Docs" },
-];
-
 const footerLinks = [
   { href: "/", label: "Home" },
   { href: "/docs", label: "Docs" },
@@ -33,22 +27,24 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             Vector Search
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex">
-            {navLinks.map((link) => (
+          <div className="flex items-center gap-3">
+            <nav className="hidden items-center gap-6 md:flex">
               <Link
-                key={link.href}
-                href={link.href}
+                href={"/"}
                 className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
               >
-                {link.label}
+                Home
               </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="hidden md:inline-flex">
-              <Button size="sm">Admin</Button>
-            </Link>
+              <Link
+                href={"/docs"}
+                className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+              >
+                Docs
+              </Link>
+              <Link href="/admin" className="hidden md:inline-flex">
+                <Button size="sm">Admin</Button>
+              </Link>
+            </nav>
             <button
               type="button"
               aria-expanded={menuOpen}
@@ -86,17 +82,28 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           )}
         >
           <nav className="mx-auto max-w-6xl px-6 pb-4 sm:px-8">
-            <div className="space-y-3 rounded-3xl border border-border/70 bg-card p-4 shadow-xl shadow-black/5">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="block rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
+            <div>
+              <Link
+                href={"/"}
+                className="block rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                - Home
+              </Link>
+              <Link
+                href={"/docs"}
+                className="block rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                - Docs
+              </Link>
+              <Link
+                href={"/admin"}
+                className="block rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                - Admin
+              </Link>
             </div>
           </nav>
         </div>
