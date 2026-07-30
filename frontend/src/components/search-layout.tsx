@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { LoaderCircle, Paperclip, Send } from "lucide-react";
+import { LoaderCircle, Send } from "lucide-react";
 
 interface SearchResult {
   id: string;
@@ -28,11 +28,6 @@ interface SearchSummary {
   generated_from: number;
   model_slug: string;
   model_label: string;
-}
-
-interface ComparisonSummary {
-  model_a: SearchSummary;
-  model_b: SearchSummary;
 }
 
 interface SearchLayoutProps {
@@ -53,7 +48,7 @@ export function SearchLayout({
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
-  const [summary, setSummary] = useState<ComparisonSummary | null>(null);
+  const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
   /** Highlight matching terms in text */
@@ -97,6 +92,7 @@ export function SearchLayout({
 
     setIsSearching(true);
     setHasSearched(true);
+    setSummary(null);
 
     const response = await fetch(
       `${backendUrl}/projects/${encodeURIComponent(
@@ -113,36 +109,25 @@ export function SearchLayout({
     const data = await response.json();
     setResults(data);
     setIsSearching(false);
-    // Reset summary when a new search happens
-    setSummary(null);
-  }
 
-  async function handleGenerateSummary() {
-    if (!query.trim() || results.length === 0) return;
-
-    setIsSummarizing(true);
-
-    try {
-      const response = await fetch(
-        `${backendUrl}/projects/${encodeURIComponent(
-          projectSlug,
-        )}/search/summary/compare?q=${encodeURIComponent(
-          query,
-        )}&model_a=qwen-3-8b&model_b=gemini-flash-lite`,
-      );
-
-      if (!response.ok) {
-        console.error("Summary generation failed:", response.statusText);
+    // Auto-generate AI summary
+    if (data.length > 0) {
+      setIsSummarizing(true);
+      try {
+        const summaryResponse = await fetch(
+          `${backendUrl}/projects/${encodeURIComponent(
+            projectSlug,
+          )}/search/summary?q=${encodeURIComponent(query)}`,
+        );
+        if (summaryResponse.ok) {
+          const summaryData: SearchSummary = await summaryResponse.json();
+          setSummary(summaryData);
+        }
+      } catch (err) {
+        console.error("Summary generation error:", err);
+      } finally {
         setIsSummarizing(false);
-        return;
       }
-
-      const data: ComparisonSummary = await response.json();
-      setSummary(data);
-    } catch (err) {
-      console.error("Summary generation error:", err);
-    } finally {
-      setIsSummarizing(false);
     }
   }
 
@@ -232,180 +217,81 @@ export function SearchLayout({
 
       {!isSearching && results.length > 0 && (
         <div className="space-y-6">
-          {/* Result Count & Summary Button */}
+          {/* Result Count */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               Found {results.length} result{results.length !== 1 ? "s" : ""}
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isSummarizing}
-              onClick={handleGenerateSummary}
-            >
-              {isSummarizing ? (
-                <>
-                  <svg
-                    className="mr-2 h-4 w-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  Summarizing...
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="mr-2 h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"
-                    />
-                  </svg>
-                  Generate AI Summary
-                </>
-              )}
-            </Button>
           </div>
 
-          {/* AI Summary Comparison — side-by-side models */}
-          {summary && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <svg
-                  className="h-5 w-5 text-primary"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"
-                  />
-                </svg>
-                <h2 className="text-lg font-semibold">AI Summary</h2>
-              </div>
+          {/* AI Summary */}
+          {isSummarizing && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">AI Summary</CardTitle>
+                <CardDescription className="text-xs">
+                  Generating...
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="animate-pulse space-y-2">
+                  <div className="h-3 w-full rounded bg-muted" />
+                  <div className="h-3 w-5/6 rounded bg-muted" />
+                  <div className="h-3 w-4/6 rounded bg-muted" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* Model A */}
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">
-                      {summary.model_a.model_label}
-                    </CardTitle>
+          {summary && !isSummarizing && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm">AI Summary</CardTitle>
                     <CardDescription className="text-xs">
-                      {summary.model_a.model_slug}
+                      {summary.model_label} &middot; {summary.generated_from}{" "}
+                      results
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="prose prose-sm max-w-none text-muted-foreground [&_p]:mb-3 [&_p:last-child]:mb-0">
-                      {summary.model_a.summary
-                        .split("\n\n")
-                        .map((paragraph, i) => {
-                          const withCitations = paragraph.replace(
-                            /\[(\d+)\]/g,
-                            (match, num) => {
-                              const idx = parseInt(num, 10) - 1;
-                              if (idx >= 0 && idx < results.length) {
-                                const r = results[idx];
-                                const href = r.source_url ?? `#result-${r.id}`;
-                                const target = r.source_url ? "_blank" : "";
-                                const rel = r.source_url
-                                  ? "noopener noreferrer"
-                                  : "";
-                                return (
-                                  `<a href="${href}" target="${target}" rel="${rel}" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
-                                  match +
-                                  ` ${r.source}</a>`
-                                );
-                              }
-                              return match;
-                            },
-                          );
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {summary.model_slug}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none text-muted-foreground [&_p]:mb-3 [&_p:last-child]:mb-0">
+                  {summary.summary.split("\n\n").map((paragraph, i) => {
+                    const withCitations = paragraph.replace(
+                      /\[(\d+)\]/g,
+                      (match, num) => {
+                        const idx = parseInt(num, 10) - 1;
+                        if (idx >= 0 && idx < results.length) {
+                          const r = results[idx];
+                          const href = r.source_url ?? `#result-${r.id}`;
+                          const target = r.source_url ? "_blank" : "";
+                          const rel = r.source_url ? "noopener noreferrer" : "";
                           return (
-                            <p
-                              key={i}
-                              dangerouslySetInnerHTML={{
-                                __html: withCitations,
-                              }}
-                            />
+                            `<a href="${href}" target="${target}" rel="${rel}" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
+                            match +
+                            ` ${r.source}</a>`
                           );
-                        })}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Model B */}
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">
-                      {summary.model_b.model_label}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {summary.model_b.model_slug}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="prose prose-sm max-w-none text-muted-foreground [&_p]:mb-3 [&_p:last-child]:mb-0">
-                      {summary.model_b.summary
-                        .split("\n\n")
-                        .map((paragraph, i) => {
-                          const withCitations = paragraph.replace(
-                            /\[(\d+)\]/g,
-                            (match, num) => {
-                              const idx = parseInt(num, 10) - 1;
-                              if (idx >= 0 && idx < results.length) {
-                                const r = results[idx];
-                                const href = r.source_url ?? `#result-${r.id}`;
-                                const target = r.source_url ? "_blank" : "";
-                                const rel = r.source_url
-                                  ? "noopener noreferrer"
-                                  : "";
-                                return (
-                                  `<a href="${href}" target="${target}" rel="${rel}" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
-                                  match +
-                                  ` ${r.source}</a>`
-                                );
-                              }
-                              return match;
-                            },
-                          );
-                          return (
-                            <p
-                              key={i}
-                              dangerouslySetInnerHTML={{
-                                __html: withCitations,
-                              }}
-                            />
-                          );
-                        })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                        }
+                        return match;
+                      },
+                    );
+                    return (
+                      <p
+                        key={i}
+                        dangerouslySetInnerHTML={{
+                          __html: withCitations,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <h2 className="text-lg font-semibold pt-16">Sources:</h2>
