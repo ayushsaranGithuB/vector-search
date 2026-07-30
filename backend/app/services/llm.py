@@ -1,5 +1,5 @@
-"""LLM service for generating grounded answers from search results.
-Uses OpenRouter to support multiple models (Qwen, Gemini, etc.) for comparison."""
+# LLM service for generating grounded answers from search results.
+# Uses OpenRouter to support multiple models (Qwen, Gemini, etc.) for comparison.
 
 import json
 import logging
@@ -49,15 +49,25 @@ def list_models() -> list[dict[str, str]]:
     ]
 
 
-SYSTEM_PROMPT = """You are a precise research assistant. Your job is to answer the user's question based *only* on the provided search result snippets.
+SYSTEM_PROMPT = """
+You are a precise research assistant. Your job is to answer the user's question using ONLY the provided search results.
 
 Rules:
-1. Answer in clear, well-structured paragraphs.
-2. Use numbered citations like [1], [2], etc. to cite the source of each fact. Always mention the source name alongside the citation number — for example: "According to [1] Motor Vehicles Rules..." rather than just "[1]".
-3. Each citation number corresponds to the numbered result list provided below.
-4. If the snippets don't contain enough information to answer, say so — do not make up facts.
-5. Always ground every factual claim in at least one citation.
-6. Write in a neutral, informative tone."""
+
+1. Never use knowledge outside the provided search results.
+2. Write in a neutral, factual tone.
+3. Organize related facts into short paragraphs.
+4. Each paragraph must contain no more than 25 words.
+5. Do NOT repeat the same citation number within a paragraph.
+6. Place ALL citations for a paragraph at the very end of that paragraph only — never inline within the sentence.
+7. Format the end of each paragraph like this: sentence text. [1][3][5]
+8. Use numbered citations like [1], [2], [3].
+9. Do not include the source name or URL inline. The frontend will resolve citation numbers into hyperlinks.
+10. Cite every factual statement, but consolidate citations whenever possible.
+11. Never invent citations or infer unsupported information.
+12. If the provided search results do not fully answer the question, explicitly state that.
+13. Prefer combining multiple sources into a single citation list, for example: [1][3][5].
+"""
 
 
 def build_context(results: list[dict[str, Any]]) -> str:
@@ -71,7 +81,8 @@ def build_context(results: list[dict[str, Any]]) -> str:
         source_url = result.get("source_url") or ""
         parts.append(
             f"[{i}] Title: {title}\n"
-            f"    Source: {source} ({citation})\n"
+            f"    Source: {source}\n"
+            f"    Citation: {citation}\n"
             f"    URL: {source_url}\n"
             f"    Content: {excerpt}\n"
         )
@@ -89,10 +100,16 @@ def _build_messages(query: str, context: str) -> list[dict[str, str]]:
 
 ## Instructions
 
-Write a concise, well-structured answer to the user's question using only the information above.
-Use numbered citations like [1], [2] to reference the search result each fact comes from.
-Always mention the source name right after the citation number — for example: "According to [1] Motor Vehicles Rules...".
-Group related facts into paragraphs. Do not use bullet points unless necessary."""
+Answer using only the search results.
+
+- Keep paragraphs under 25 words.
+- Never repeat the same citation number within a paragraph.
+- Place ALL citations at the very end of the paragraph — never inside a sentence.
+- Example of correct format: "Drivers must be at least 18 years old. [1][3]"
+- Example of WRONG format (do not do this): "Drivers must be at least 18 years old [1] and pass a test [3]."
+- Group related information together.
+- Return Markdown only.
+"""
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},

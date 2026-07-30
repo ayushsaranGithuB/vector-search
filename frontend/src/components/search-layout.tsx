@@ -10,6 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
+import { LoaderCircle, Paperclip, Send } from "lucide-react";
 
 interface SearchResult {
   id: string;
@@ -147,41 +149,56 @@ export function SearchLayout({
   return (
     <div className="mx-auto max-w-4xl px-6 py-12 lg:px-8">
       {/* Project Header */}
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight">{projectName}</h1>
-        <p className="mt-2 text-muted-foreground">{projectDescription}</p>
+      <div className="mb-8 text-center flex flex-col items-center gap-2">
+        <Image src={"/images/car.svg"} width={60} height={60} alt="car icon" />
+        <h1 className="text-xl font-bold tracking-tight">{projectName}</h1>
+        <p className="mt-2 text-muted-foreground text-sm">
+          {projectDescription}
+        </p>
       </div>
 
       {/* Search Box */}
       <form onSubmit={handleSearch} className="mb-8">
         <div className="flex gap-3">
-          <div className="relative flex-1">
-            <input
-              type="text"
+          <div className="relative flex-1 rounded-lg border border-input bg-background px-4 py-3 pb-12 ">
+            <textarea
+              name="searchQuery"
               value={query}
+              rows={2}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search across documents..."
-              className="flex h-12 w-full rounded-lg border border-input bg-background px-4 py-3 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSearch(e);
+                }
+              }}
+              placeholder="Ask a question or search across official documents..."
+              className="flex w-full  text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none  disabled:cursor-not-allowed disabled:opacity-50 placeholder:text-neutral-400 field-sizing-content resize-none"
             />
+            <Button
+              type="submit"
+              size="lg"
+              disabled={isSearching || !query.trim()}
+              className={"absolute bottom-2 right-2"}
+            >
+              {isSearching ? (
+                <LoaderCircle className="animateRotate" />
+              ) : (
+                <Send />
+              )}
+            </Button>
           </div>
-          <Button
-            type="submit"
-            size="lg"
-            disabled={isSearching || !query.trim()}
-          >
-            {isSearching ? "Searching..." : "Search"}
-          </Button>
         </div>
       </form>
 
       {/* Search Mode Toggle */}
-      <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
+      {/* <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
         <span>Search mode:</span>
         <Badge variant="secondary" className="cursor-pointer">
           Hybrid
         </Badge>
         <span className="text-xs">(keyword + vector)</span>
-      </div>
+      </div> */}
 
       {/* Results Area */}
       {isSearching && (
