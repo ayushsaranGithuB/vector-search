@@ -250,8 +250,7 @@ export function SearchLayout({
                   <div>
                     <CardTitle className="text-sm">AI Summary</CardTitle>
                     <CardDescription className="text-xs">
-                      {summary.model_label} &middot; {summary.generated_from}{" "}
-                      results
+                      Generated from {summary.generated_from} results
                     </CardDescription>
                   </div>
                   <Badge variant="secondary" className="text-xs">
