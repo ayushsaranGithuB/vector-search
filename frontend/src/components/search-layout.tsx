@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { LoaderCircle, Send } from "lucide-react";
+import { FileText, Link, LoaderCircle, Send } from "lucide-react";
 
 interface SearchResult {
   id: string;
   title: string;
   excerpt: string;
   source: string;
+  source_type: string;
   source_url: string | null;
   score: number;
   citation: string;
@@ -50,6 +51,7 @@ export function SearchLayout({
   const [hasSearched, setHasSearched] = useState(false);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [expandedSource, setExpandedSource] = useState<string | null>(null);
 
   /** Highlight matching terms in text */
   function highlightMatches(
@@ -93,6 +95,7 @@ export function SearchLayout({
     setIsSearching(true);
     setHasSearched(true);
     setSummary(null);
+    setExpandedSource(null);
 
     const response = await fetch(
       `${backendUrl}/projects/${encodeURIComponent(
@@ -221,6 +224,16 @@ export function SearchLayout({
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
               Found {results.length} result{results.length !== 1 ? "s" : ""}
+              {(() => {
+                const uniqueSources = new Set(results.map((r) => r.source))
+                  .size;
+                if (uniqueSources < results.length) {
+                  return ` from ${uniqueSources} source${
+                    uniqueSources !== 1 ? "s" : ""
+                  }`;
+                }
+                return "";
+              })()}
             </p>
           </div>
 
@@ -295,51 +308,107 @@ export function SearchLayout({
 
           <h2 className="text-lg font-semibold pt-16">Sources:</h2>
 
-          {/* Result Cards */}
-          {results.map((result, index) => (
-            <Card
-              key={result.id}
-              id={`result-${result.id}`}
-              className="border-border/50 transition-colors hover:border-border"
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <CardTitle className="text-base">
-                      <span className="text-xs font-normal text-muted-foreground mr-1">
-                        [{index + 1}]
-                      </span>
-                      {highlightMatches(result.title, query)}
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      Source:{" "}
-                      {result.source_url ? (
-                        <a
-                          href={result.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-primary underline-offset-2 hover:underline"
+          {/* Grouped Source Cards (accordion-style) */}
+          {(() => {
+            // Group chunks by source name
+            const grouped = new Map<string, SearchResult[]>();
+            for (const result of results) {
+              const key = result.source;
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key)!.push(result);
+            }
+
+            return Array.from(grouped.entries()).map(([sourceName, chunks]) => {
+              const first = chunks[0];
+              const isOpen = expandedSource === sourceName;
+
+              return (
+                <Card
+                  key={sourceName}
+                  className="border-border/50 transition-colors hover:border-border"
+                >
+                  <CardHeader
+                    className="cursor-pointer select-none"
+                    onClick={() =>
+                      setExpandedSource(isOpen ? null : sourceName)
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          {first.source_type === "pdf" ? (
+                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          ) : (
+                            <Link className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
+                          {highlightMatches(sourceName, query)}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          Source:{" "}
+                          {first.source_url ? (
+                            <a
+                              href={first.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-primary underline-offset-2 hover:underline"
+                            >
+                              {first.source}
+                            </a>
+                          ) : (
+                            first.source
+                          )}{" "}
+                          &middot; {chunks.length} chunk
+                          {chunks.length !== 1 ? "s" : ""}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant="outline">
+                          {(
+                            Math.max(...chunks.map((c) => c.score)) * 100
+                          ).toFixed(0)}
+                          % match
+                        </Badge>
+                        <svg
+                          className={`h-4 w-4 text-muted-foreground transition-transform ${
+                            isOpen ? "rotate-180" : ""
+                          }`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={2}
+                          stroke="currentColor"
                         >
-                          {result.source}
-                        </a>
-                      ) : (
-                        result.source
-                      )}{" "}
-                      &middot; Citation: {result.citation}
-                    </CardDescription>
-                  </div>
-                  <Badge variant="outline" className="shrink-0">
-                    {(result.score * 100).toFixed(0)}% match
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {highlightMatches(result.excerpt, query)}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {isOpen && (
+                    <CardContent className="space-y-4 border-t pt-4">
+                      {chunks.map((chunk, ci) => (
+                        <div key={chunk.id}>
+                          <div className="mb-1 flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              Chunk {ci + 1}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {chunk.citation}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {highlightMatches(chunk.excerpt, query)}
+                          </p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            });
+          })()}
         </div>
       )}
 

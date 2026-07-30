@@ -10,6 +10,7 @@ class SearchResultOut(BaseModel):
     title: str
     excerpt: str
     source: str
+    source_type: str = ""  # "url" or "pdf"
     source_url: str | None = None  # link to original document (URL or R2 PDF)
     score: float
     citation: str
