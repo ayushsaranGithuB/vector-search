@@ -149,7 +149,7 @@ def _estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> floa
     """
     # Prices are per 1M tokens (input / output).
     pricing: dict[str, tuple[float, float]] = {
-        "qwen/qwen3.7-flash": (0.0, 0.0),
+        "qwen/qwen3.7-flash": (0.03, 0.13),
     }
     if model_id not in pricing:
         return None

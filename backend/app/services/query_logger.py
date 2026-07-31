@@ -1,4 +1,4 @@
-"""Lightweight query analytics logger backed by Prisma.
+"""Lightweight query analytics logger that writes to a local JSONL file.
 
 Records search queries, LLM calls (with tokens/cost/latency), and errors so
 that the observability dashboard can surface real usage metrics.
@@ -6,11 +6,44 @@ that the observability dashboard can surface real usage metrics.
 
 from __future__ import annotations
 
+import json
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
-from app.db import prisma
+from loguru import logger
+
+# Store logs alongside the app so they survive restarts and are easy to inspect.
+LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+QUERY_LOG_FILE = LOG_DIR / "query_analytics.jsonl"
+
+# Add a dedicated sink for query analytics so we can read it back as structured JSONL.
+logger.add(
+    QUERY_LOG_FILE,
+    serialize=True,
+    rotation="1 day",
+    retention="30 days",
+    enqueue=True,
+    filter=lambda record: record["extra"].get("analytics") is True,
+)
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _write(event: str, payload: dict[str, Any]) -> None:
+    try:
+        logger.bind(analytics=True).info(
+            event,
+            **{"analytics_event": event, **payload},
+        )
+    except Exception:
+        # Logging must never break the user-facing request path.
+        pass
 
 
 class QueryLogger:
@@ -25,20 +58,17 @@ class QueryLogger:
         latency_ms: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        try:
-            await prisma.querylog.create(
-                data={
-                    "project_id": project_id,
-                    "event": "SEARCH",
-                    "query": query,
-                    "source_ids": source_ids or [],
-                    "latency_ms": latency_ms,
-                    "metadata": metadata or {},
-                }
-            )
-        except Exception:
-            # Logging must never break the user-facing request path.
-            pass
+        _write(
+            "SEARCH",
+            {
+                "timestamp": _now(),
+                "project_id": project_id,
+                "query": query,
+                "source_ids": source_ids or [],
+                "latency_ms": latency_ms,
+                "metadata": metadata or {},
+            },
+        )
 
     @staticmethod
     async def log_llm(
@@ -52,22 +82,20 @@ class QueryLogger:
         latency_ms: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        try:
-            await prisma.querylog.create(
-                data={
-                    "project_id": project_id,
-                    "event": "LLM_CALL",
-                    "query": query,
-                    "model_slug": model_slug,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "cost_usd": cost_usd,
-                    "latency_ms": latency_ms,
-                    "metadata": metadata or {},
-                }
-            )
-        except Exception:
-            pass
+        _write(
+            "LLM_CALL",
+            {
+                "timestamp": _now(),
+                "project_id": project_id,
+                "query": query,
+                "model_slug": model_slug,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cost_usd": cost_usd,
+                "latency_ms": latency_ms,
+                "metadata": metadata or {},
+            },
+        )
 
     @staticmethod
     async def log_error(
@@ -77,18 +105,16 @@ class QueryLogger:
         query: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        try:
-            await prisma.querylog.create(
-                data={
-                    "project_id": project_id,
-                    "event": "ERROR",
-                    "query": query,
-                    "error_message": error_message,
-                    "metadata": metadata or {},
-                }
-            )
-        except Exception:
-            pass
+        _write(
+            "ERROR",
+            {
+                "timestamp": _now(),
+                "project_id": project_id,
+                "query": query,
+                "error_message": error_message,
+                "metadata": metadata or {},
+            },
+        )
 
 
 @asynccontextmanager
