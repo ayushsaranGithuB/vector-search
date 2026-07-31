@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     s3_api_endpoint: str | None = Field(default=None, alias="S3_API_ENDPOINT")
     r2_public_url: str = Field(default="", alias="R2_PUBLIC_URL")
     enable_comparison: bool = Field(default=False, alias="ENABLE_COMPARISON")
+    cohere_api_key: str = Field(default="", alias="COHERE_API_KEY")
+    rerank_top_k: int = Field(default=20, alias="RERANK_TOP_K")  # how many Pinecone results to fetch before reranking
 
     @property
     def r2_base_endpoint(self) -> str:

@@ -2,6 +2,7 @@
 from app.db import prisma
 from app.services.pinecone import pinecone_available, query_vectors
 from app.services.queue import enqueue_ingestion_for_source
+from app.services.reranker import rerank
 
 
 async def list_projects() -> list[ProjectOut]:
@@ -57,72 +58,7 @@ async def list_project_search_results(slug: str, query: str) -> list[dict]:
     if project is None:
         return []
 
-    chunks = []
-    if query and pinecone_available():
-        try:
-            matches = await query_vectors(query, namespace=slug)
-            chunk_ids = [chunk_id for chunk_id, score in matches]
-            if chunk_ids:
-                found_chunks = await prisma.chunk.find_many(
-                    where={"id": {"in": chunk_ids}},
-                )
-                chunk_map = {chunk.id: chunk for chunk in found_chunks}
-                ordered = [chunk_map[chunk_id] for chunk_id in chunk_ids if chunk_id in chunk_map]
-                chunks = ordered
-        except Exception:
-            chunks = []
-
-    if not chunks:
-        chunks = await prisma.chunk.find_many(
-            where={
-                "source": {"project_id": project.id},
-                "content": {"contains": query, "mode": "insensitive"},
-            },
-            order={"updated_at": "desc"},
-            take=10,
-        )
-
-    results = []
-    for index, chunk in enumerate(chunks):
-        source = await prisma.source.find_unique(where={"id": chunk.source_id})
-        source_name = source.name if source is not None else "Unknown source"
-        excerpt = chunk.content
-        if query:
-            lower_query = query.lower()
-            lower_content = chunk.content.lower()
-            position = lower_content.find(lower_query)
-            if position != -1:
-                start = max(0, position - 100)
-                end = min(len(chunk.content), position + 100)
-                excerpt = f"...{chunk.content[start:end].strip()}..."
-
-        # Build source URL
-        from app.core.config import get_settings
-        from app.services.uploads import build_r2_object_key
-
-        settings = get_settings()
-        source_url: str | None = None
-        if source is not None:
-            if source.source_type == "URL":
-                source_url = source.source_url
-            elif source.source_type == "PDF" and source.file_name and settings.r2_public_url:
-                object_key = build_r2_object_key(slug, source.id, source.file_name)
-                source_url = f"{settings.r2_public_url}/{object_key}"
-
-        results.append(
-            {
-                "id": chunk.id,
-                "title": source_name,
-                "excerpt": excerpt,
-                "source": source_name,
-                "source_type": source.source_type.lower() if source else "",
-                "source_url": source_url,
-                "score": 1.0,
-                "citation": f"chunk {chunk.chunk_index}",
-            }
-        )
-
-    return results
+    return await _fetch_and_rerank(project, query, slug)
 
 
 def map_project(project) -> ProjectOut:
@@ -191,18 +127,21 @@ def enum_value(value: object) -> str:
     return getattr(value, "value", str(value))
 
 
-async def _fetch_search_results(project, query: str) -> list[dict]:
-    """Shared helper: fetch and format search results for a project + query."""
+async def _fetch_and_rerank(project, query: str, slug: str) -> list[dict]:
+    """Fetch chunks via Pinecone (or keyword fallback), format them, then
+    re-rank with the configured reranker for improved result quality."""
     from app.core.config import get_settings
-    from app.services.pinecone import pinecone_available, query_vectors
     from app.services.uploads import build_r2_object_key
 
     settings = get_settings()
 
+    # Fetch more candidates than we need — the reranker will pick the best
+    fetch_k = settings.rerank_top_k
+
     chunks: list = []
     if query and pinecone_available():
         try:
-            matches = await query_vectors(query, namespace=project.slug)
+            matches = await query_vectors(query, top_k=fetch_k, namespace=slug)
             chunk_ids = [chunk_id for chunk_id, score in matches]
             if chunk_ids:
                 found_chunks = await prisma.chunk.find_many(
@@ -224,7 +163,8 @@ async def _fetch_search_results(project, query: str) -> list[dict]:
             take=10,
         )
 
-    results = []
+    # Build result dicts from chunks
+    results: list[dict] = []
     for chunk in chunks:
         source = await prisma.source.find_unique(where={"id": chunk.source_id})
         source_name = source.name if source is not None else "Unknown source"
@@ -238,13 +178,12 @@ async def _fetch_search_results(project, query: str) -> list[dict]:
                 end = min(len(chunk.content), position + 100)
                 excerpt = f"...{chunk.content[start:end].strip()}..."
 
-        # Build source URL
         source_url: str | None = None
         if source is not None:
             if source.source_type == "URL":
                 source_url = source.source_url
             elif source.source_type == "PDF" and source.file_name and settings.r2_public_url:
-                object_key = build_r2_object_key(project.slug, source.id, source.file_name)
+                object_key = build_r2_object_key(slug, source.id, source.file_name)
                 source_url = f"{settings.r2_public_url}/{object_key}"
 
         results.append({
@@ -258,7 +197,19 @@ async def _fetch_search_results(project, query: str) -> list[dict]:
             "citation": f"chunk {chunk.chunk_index}",
         })
 
+    # Re-rank for better relevance ordering
+    if results and query:
+        try:
+            results = await rerank(query, results, top_n=10)
+        except Exception:
+            pass  # keep original ordering on rerank failure
+
     return results
+
+
+async def _fetch_search_results(project, query: str) -> list[dict]:
+    """Shared helper: fetch and format search results for a project + query."""
+    return await _fetch_and_rerank(project, query, project.slug)
 
 
 async def summarize_search_results(

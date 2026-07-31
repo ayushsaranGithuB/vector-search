@@ -468,8 +468,7 @@ function SearchLayoutInner({
                           const target = r.source_url ? "_blank" : "";
                           const rel = r.source_url ? "noopener noreferrer" : "";
                           return (
-                            `<a href="${href}" target="${target}" rel="${rel}" class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
-                            match +
+                            `<a href="${href}" target="${target}" rel="${rel}" class="block w-fit mb-4 mt-1 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary no-underline hover:bg-primary/20">` +
                             ` ${r.source}</a>`
                           );
                         }
@@ -479,6 +478,7 @@ function SearchLayoutInner({
                     return (
                       <p
                         key={i}
+                        className="text-md"
                         dangerouslySetInnerHTML={{
                           __html: withCitations,
                         }}

@@ -61,17 +61,17 @@ Rules:
 
 1. Never use knowledge outside the provided search results.
 2. Write in a neutral, factual tone.
-3. Organize related facts into short paragraphs.
-4. Each paragraph must contain no more than 25 words.
-5. Do NOT repeat the same citation number within a paragraph.
-6. Place ALL citations for a paragraph at the very end of that paragraph only — never inline within the sentence.
-7. Format the end of each paragraph like this: sentence text. [1][3][5]
-8. Use numbered citations like [1], [2], [3].
-9. Do not include the source name or URL inline. The frontend will resolve citation numbers into hyperlinks.
-10. Cite every factual statement, but consolidate citations whenever possible.
-11. Never invent citations or infer unsupported information.
-12. If the provided search results do not fully answer the question, explicitly state that.
-13. Prefer combining multiple sources into a single citation list, for example: [1][3][5].
+3. Group ALL facts that come from the SAME source into a single paragraph. Do NOT split facts from one source across multiple paragraphs.
+4. Each paragraph should cover one source only. If you have facts from multiple sources, use separate paragraphs.
+5. Place ALL citations for a paragraph at the very end of that paragraph only — never inline within the sentence.
+6. Format the end of each paragraph like this: sentence text. [1][3][5]
+7. Use numbered citations like [1], [2], [3].
+8. Do not include the source name or URL inline. The frontend will resolve citation numbers into hyperlinks.
+9. Cite every factual statement, but consolidate citations whenever possible.
+10. Never invent citations or infer unsupported information.
+11. If the provided search results do not fully answer the question, explicitly state that.
+12. Prefer combining multiple sources into a single citation list, for example: [1][3][5].
+13. Do NOT repeat the same citation number across multiple paragraphs. Each source should be cited in exactly one paragraph.
 """
 
 
@@ -123,12 +123,11 @@ def _build_messages(query: str, context: str) -> list[dict[str, str]]:
 
 Answer using only the search results.
 
-- Keep paragraphs under 25 words.
-- Never repeat the same citation number within a paragraph.
+- Group ALL facts from the SAME source into ONE paragraph. Do NOT split one source's facts across multiple paragraphs.
+- Each source should appear in exactly ONE paragraph with its citation at the end.
 - Place ALL citations at the very end of the paragraph — never inside a sentence.
-- Example of correct format: "Drivers must be at least 18 years old. [1][3]"
-- Example of WRONG format (do not do this): "Drivers must be at least 18 years old [1] and pass a test [3]."
-- Group related information together.
+- Example of correct format: "Drivers must be at least 18 years old. Sixteen-year-olds may drive gearless motorcycles under 50cc. [1]"
+- Example of WRONG format (do not do this): "Drivers must be at least 18 years old [1]. Sixteen-year-olds may drive gearless motorcycles [1]."
 - Return Markdown only.
 - Start the answer with a brief summary of the findings, then provide a detailed answer with citations.
 
