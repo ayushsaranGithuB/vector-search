@@ -12,12 +12,15 @@ This repo is organized around product areas so the platform can grow into multip
 
 ## Backend
 
-- `FastAPI` API layer (12 endpoints)
+- `FastAPI` API layer (14 endpoints)
 - Project and source management endpoints
 - Ingestion pipeline (PDF text extraction, URL fetching, chunking, embedding)
 - Chunking and embedding workflow (1000-char chunks, 200-char overlap, Pinecone Inference)
-- Retrieval pipeline (Pinecone vector search → PostgreSQL keyword fallback)
-- Answer generation and citation assembly — *not yet implemented*
+- Retrieval pipeline (Pinecone vector search → PostgreSQL keyword fallback → Cohere reranking)
+- Answer generation via OpenRouter (Qwen 3.7 Flash) with numbered citations
+- Async worker for queue-based ingestion (CloudAMQP consumer)
+- Query analytics and observability logging (loguru-based JSONL file sink)
+- Spell correction for user queries (`query_normalizer.py`)
 - Async worker for queue-based ingestion (CloudAMQP consumer)
 
 ## Product Concepts
@@ -36,9 +39,13 @@ This repo is organized around product areas so the platform can grow into multip
 - `Retrieval`
   - Keyword (PostgreSQL), vector (Pinecone), or hybrid lookup over chunks
 - `Citation`
-  - A link from an answer back to source evidence — *not yet implemented*
+  - A link from an answer back to source evidence — LLM-generated summaries include numbered citations [1], [2], etc.
 - `Observability`
-  - Search traces, quality metrics, and evaluation views — *not yet implemented*
+  - Search traces, LLM token/cost tracking, and error logs — written to local JSONL files via loguru and displayed on the admin observability dashboard
+- `Query Normalizer`
+  - Corrects typos in user search queries (e.g. "learners lisense" → "learner's license") before retrieval
+- `Reranker`
+  - Cohere cross-encoder re-scores initial search results for improved precision at the top of the list
 
 ## Expansion Model
 

@@ -44,14 +44,32 @@ const howItWorks = [
   {
     title: "4. Search (Hybrid Retrieval)",
     description:
-      "When a user searches, the query is embedded via Pinecone Inference and used for a vector search. Simultaneously, a PostgreSQL keyword fallback (CONTAINS) runs for lexical matching. Results from both paths are merged into a single ranked list.",
+      "When a user searches, their query is first spell-corrected (fixing typos like 'learners lisense' → 'learner's license'), then embedded via Pinecone Inference for vector search. A PostgreSQL keyword fallback (CONTAINS) runs simultaneously for lexical matching. An initial candidate list is merged from both paths.",
     icon: <Search size={20} />,
   },
   {
-    title: "5. Return Results with Citations",
+    title: "5. Rerank Results",
     description:
-      "Each result includes the chunk content, its source document name, a relevance score, and a citation link. The frontend displays everything in a clean card layout so users can inspect exactly why each result was returned.",
+      "Initial candidates are re-scored by a Cohere cross-encoder model for improved precision at the top of the list. The reranker considers semantic relevance between the query and each result, producing a more accurate ranking than vector similarity alone.",
+    icon: <Layers size={20} />,
+  },
+  {
+    title: "6. Return Results with Citations",
+    description:
+      "Each result includes the chunk content, its source document name, a relevance score, and a citation link. Matched query terms are highlighted in the results, skipping common words. The frontend displays everything in a clean card layout so users can inspect exactly why each result was returned.",
     icon: <ShieldCheck size={20} />,
+  },
+  {
+    title: "7. Generate AI Summary (Optional)",
+    description:
+      "Users can click 'Generate AI Summary' to produce a grounded answer. The backend sends the top results to OpenRouter (Qwen 3.7 Flash) which generates a natural language summary with numbered citations — each mapped directly to a source document.",
+    icon: <BrainCircuit size={20} />,
+  },
+  {
+    title: "8. Observe & Debug",
+    description:
+      "Every search query, LLM call, and error is logged to a local JSONL file via loguru. The admin observability dashboard (at /admin/observability) reads these logs and displays real-time metrics: query latency, source IDs, token counts, estimated cost, and error messages.",
+    icon: <BarChart3 size={20} />,
   },
 ];
 
@@ -59,37 +77,37 @@ const coreCapabilities = [
   {
     title: "Grounded Answers",
     description:
-      "Answers backed by source citations with highlighted retrieved text.",
+      "Answers backed by source citations with LLM-generated summaries — each claim mapped to numbered source links.",
     lucideIcon: <Route size={18} />,
   },
   {
     title: "Hybrid Search",
     description:
-      "Keyword, vector, and hybrid retrieval combined for the best results.",
+      "Keyword, vector, and hybrid retrieval combined for the best results across semantic and exact-match queries.",
     lucideIcon: <Search size={18} />,
+  },
+  {
+    title: "Reranking",
+    description:
+      "Cohere cross-encoder re-scores initial candidates for improved precision at the top of the result list.",
+    lucideIcon: <Layers size={18} />,
+  },
+  {
+    title: "Spell Correction",
+    description:
+      "Automatic typo fixing in user queries — 'learners lisense' becomes 'learner's license' before retrieval.",
+    lucideIcon: <Eye size={18} />,
   },
   {
     title: "Full Observability",
     description:
-      "Cosine similarity scores, rerank scores, and latency for each pipeline stage.",
+      "Search queries, LLM token usage and cost, latency, and errors — logged to JSONL and displayed on the admin dashboard.",
     lucideIcon: <BarChart3 size={18} />,
-  },
-  {
-    title: "Citation Inspection",
-    description:
-      "Flag unsupported claims when an answer is not backed by citations.",
-    lucideIcon: <Eye size={18} />,
-  },
-  {
-    title: "Embedding Visualisation",
-    description:
-      "Visualise embeddings with UMAP or t-SNE to understand your data.",
-    lucideIcon: <Layers size={18} />,
   },
   {
     title: "Multi-Project SaaS",
     description:
-      "Each project is a separate searchable workspace with its own sources and settings.",
+      "Each project is a separate searchable workspace with its own sources, Pinecone namespace, and settings.",
     lucideIcon: <Form size={18} />,
   },
 ];
@@ -181,8 +199,12 @@ const techStack = [
         why: "Merges keyword and vector results into a single ranked list, combining the strengths of both approaches.",
       },
       {
-        label: "Reranking",
-        why: "Improves result quality by re-scoring initial candidates with a cross-encoder model for more precise relevance.",
+        label: "Spell Correction",
+        why: "Automatic typo fixing (query_normalizer.py) fixes common misspellings before retrieval — e.g. 'learners lisense' → 'learner's license'.",
+      },
+      {
+        label: "Reranking (Cohere)",
+        why: "Cross-encoder model re-ranks initial search results for better precision at the top of the list, improving over pure vector similarity.",
       },
     ],
     icon: <Search size={18} />,
@@ -191,16 +213,16 @@ const techStack = [
     title: "AI & Models",
     items: [
       {
-        label: "Embeddings Model (multilingual-e5-large)",
+        label: "Embeddings (multilingual-e5-large)",
         why: "Pinecone's hosted model generates 1024-dim vectors from plain text — no separate embedding infrastructure needed.",
       },
       {
         label: "LLM for Generation (Qwen 3.7 Flash)",
-        why: "OpenRouter-hosted model generates grounded answers with citations from retrieved chunks.",
+        why: "OpenRouter-hosted model generates grounded answers with numbered citations from retrieved chunks. Cost: $0.03/M input tokens, $0.13/M output tokens.",
       },
       {
-        label: "Reranking Model",
-        why: "Cross-encoder model re-ranks initial search results for better precision at the top of the list.",
+        label: "Reranker Model (Cohere)",
+        why: "Cross-encoder re-ranks initial search results for improved relevance ordering at the top of the list.",
       },
     ],
     icon: <BrainCircuit size={18} />,
@@ -209,20 +231,12 @@ const techStack = [
     title: "Observability",
     items: [
       {
-        label: "Retrieval Traces",
-        why: "End-to-end tracing of each query through the pipeline — embedding, search, rerank, generation — for debugging and optimization.",
+        label: "Query Analytics (loguru JSONL)",
+        why: "Every search query, LLM call (with token counts and cost), latency, and error is logged to a local JSONL file — no database dependency for observability.",
       },
       {
-        label: "Query Analytics",
-        why: "Aggregated metrics on query volume, latency, and result quality across all projects.",
-      },
-      {
-        label: "Evaluation Datasets",
-        why: "Curated test queries with expected results for measuring retrieval quality and tracking regressions.",
-      },
-      {
-        label: "Citation Inspection",
-        why: "Tooling to verify that generated answers are properly grounded in retrieved sources, flagging unsupported claims.",
+        label: "Observability Dashboard",
+        why: "Admin page at /admin/observability reads the JSONL log file and displays real-time metrics with cards for each event type.",
       },
     ],
     icon: <BarChart3 size={18} />,
@@ -236,6 +250,11 @@ const designDecisions = [
       "Vector search alone can miss exact keyword matches (part numbers, legal citations, proper names). PostgreSQL CONTAINS provides a simple lexical fallback that catches these cases with zero extra infrastructure.",
   },
   {
+    title: "Why reranking after vector search?",
+    description:
+      "Vector similarity (cosine distance) is a good first pass but can miss nuanced relevance. A cross-encoder like Cohere re-scores each candidate specifically against the query, producing a much sharper ranking at the cost of a second inference pass.",
+  },
+  {
     title: "Why Pinecone namespaces over separate indexes?",
     description:
       "One shared index with per-project namespaces keeps operations simple — no need to provision, monitor, or pay for separate indexes per project. Each project's data is isolated at the namespace level.",
@@ -246,9 +265,19 @@ const designDecisions = [
       "PDF parsing and embedding generation take time. Queuing the work decouples the API from processing — the user gets an immediate response and the worker processes jobs as capacity allows.",
   },
   {
+    title: "Why spell correction before search?",
+    description:
+      "Vector search is robust to minor typos, but keyword fallback (CONTAINS) is not. Correcting typos before retrieval ensures both paths work well — and the UI can highlight the corrected terms for transparency.",
+  },
+  {
+    title: "Why loguru JSONL files instead of a database for analytics?",
+    description:
+      "Observability data is append-only, high-volume, and doesn't need ACID semantics. Writing to a local JSONL file via loguru is simpler, faster, and doesn't add load to the primary database. Rotation and retention are handled by loguru's built-in file management.",
+  },
+  {
     title: "Why not LangChain / LlamaIndex?",
     description:
-      "This project's retrieval pipeline is straightforward: chunk → embed → search. Adding an orchestration framework would introduce abstraction overhead without meaningful benefit. The direct approach is easier to debug, extend, and understand.",
+      "This project's retrieval pipeline is straightforward: chunk → embed → search → rerank → generate. Adding an orchestration framework would introduce abstraction overhead without meaningful benefit. The direct approach is easier to debug, extend, and understand.",
   },
   {
     title: "Why Prisma across both frontend and backend?",
@@ -479,6 +508,26 @@ export default function DocsPage() {
                     <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
                     Public per-project search pages
                   </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                    LLM-grounded answers with numbered citations
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                    Reranking (Cohere cross-encoder)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                    Spell correction for user queries
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                    Search term highlighting
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                    Query analytics &amp; observability dashboard
+                  </li>
                 </ul>
               </CardContent>
             </Card>
@@ -497,23 +546,31 @@ export default function DocsPage() {
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                    LLM integration for grounded answer generation
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                    Reranking to improve result quality
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                    Query analytics and retrieval traces
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                     Evaluation datasets for quality measurement
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    Retrieval traces (per-query pipeline tracing)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    Related-document and cross-link views
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    Second demo project
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                     Docker-based local and deployment support
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    Wire up "Sync Sources" button in admin panel
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    Populate pinecone_vector_id on chunks after upsert
                   </li>
                 </ul>
               </CardContent>

@@ -15,26 +15,32 @@
 - [x] Support semantic search through Pinecone, including hosted-embedding indexes and per-project namespaces
 - [x] Store source metadata for filtering (hybrid search: vector + PostgreSQL keyword fallback)
 
-# Stage 3: Grounded Answers
+# Stage 3: Grounded Answers ✅
 
 - [x] Add hybrid search (Pinecone vector search → PostgreSQL `CONTAINS` keyword fallback)
 - [x] Add citations and source highlighting (score badges, source names, chunk content in results)
 - [x] Build the first query UI in `Next.js` (search-layout with loading skeletons, empty states, results cards)
-- [ ] Return grounded answers from the backend (requires LLM integration — currently returns chunks, not generated answers)
-- [ ] Support opening source passages from answers
+- [x] Return grounded answers from the backend (LLM integration via OpenRouter — Qwen 3.7 Flash generates answers with numbered citations)
+- [x] Support opening source passages from answers (citation links open source cards)
 
-# Stage 4: Quality And Observability
+# Stage 4: Quality And Observability ✅
 
-- [ ] Add reranking
-- [ ] Add query analytics
+- [x] Add reranking (Cohere cross-encoder re-scores initial candidates for improved relevance)
+- [x] Add query analytics (loguru-based JSONL file logging for search, LLM, and error events)
+- [x] Add observability dashboard (admin `/admin/observability` page with real-time logs)
 - [ ] Add evaluation datasets
-- [ ] Add retrieval traces
+- [ ] Add retrieval traces (in-depth per-query pipeline tracing)
 - [ ] Add related-document or cross-link views
 
 # Stage 5: Multi-Project SaaS Polish
 
 - [x] Admin dashboard for per-project source management (create, cancel, delete, auto-polling)
 - [x] Public project search pages (per-project namespace isolation)
+- [x] Observability and analytics dashboard
+- [x] Spell correction for user queries (typo fixing via `query_normalizer.py`)
+- [x] Search term highlighting (common-word skipping, corrected-query highlighting)
+- [x] Grouped results by source document
+- [x] Default AI summary view on search
 - [ ] Add a second demo project
 - [ ] Improve admin/project dashboards
 - [ ] Add Docker-based local and deployment support

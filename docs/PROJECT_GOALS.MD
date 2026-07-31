@@ -29,7 +29,7 @@ The product should feel like a SaaS knowledge workspace:
 |-----------|--------|
 | A user can pick a project and ask a question | ✅ Done — per-project search pages with hybrid search |
 | The answer returns citations tied to source passages | ✅ Done — search returns chunks with source metadata; LLM-generated answers with numbered citations on summary card |
-| The UI shows why the result was retrieved | ✅ Done — score badges, source names, chunk content in results |
+| The UI shows why the result was retrieved | ✅ Done — score badges, source names, chunk content in results, search term highlighting |
 | Different search modes can be compared | 🟡 Partial — hybrid search works; dedicated mode toggle not yet built |
 | A new project can be added without changing core retrieval architecture | ✅ Done — projects are isolated by Pinecone namespace; add via DB + config |
 
@@ -41,7 +41,7 @@ The product should feel like a SaaS knowledge workspace:
 | Add or manage sources inside a project | ✅ Done — admin panel with PDF/URL upload, cancel, delete, auto-polling |
 | Ask a question and receive a grounded answer | ✅ Done — "Generate AI Summary" button produces LLM-grounded answer with numbered citations |
 | Open citations and inspect source passages | ✅ Done — numbered result cards with clickable citation links from AI summary |
-| Review retrieval traces and search quality signals | ❌ Not yet implemented |
+| Review retrieval traces and search quality signals | ✅ Done — admin observability dashboard with search, LLM, and error logs |
 | Compare search modes and reranking output | ❌ Not yet implemented |
 
 ## Non-Goals For v1

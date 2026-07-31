@@ -35,6 +35,8 @@
   - Async RabbitMQ client for the CloudAMQP ingestion queue
 - `pinecone` SDK
   - Vector database client for semantic search operations
+- `loguru`
+  - Structured JSONL logging for query analytics (search, LLM calls, errors) written to `backend/logs/query_analytics.jsonl`
 
 ## Data and Storage
 
@@ -57,6 +59,8 @@
 
 - Chunking pipeline
   - Breaks source documents into retrievable units (1000 chars, 200-char overlap)
+- Spell correction
+  - Corrects typos in user queries before retrieval (e.g. "learners lisense" → "learner's license")
 - Keyword search
   - PostgreSQL `CONTAINS` fallback for exact-match and lexical retrieval
 - Vector search
@@ -64,27 +68,31 @@
 - Hybrid retrieval
   - Combines lexical (PostgreSQL) and semantic (Pinecone) results
 - Reranking
-  - *Not yet implemented* — planned for Stage 4
+  - Cohere cross-encoder model re-scores initial candidates for improved relevance at the top of the list
+- Search term highlighting
+  - Highlights matched terms in results, skipping common words (a, of, the, why, when, etc.)
 
 ## AI and Generation
 
 - Embeddings provider
   - **Implemented**: Pinecone Inference `multilingual-e5-large` (batched 96 vectors per request)
 - LLM provider
-  - *Not yet implemented* — needed for grounded answer generation (Stage 3)
-- Optional reranker model or API
-  - *Not yet implemented* — planned for Stage 4
+  - **Implemented**: OpenRouter-hosted `qwen/qwen3.7-flash` for grounded answer generation with numbered citations
+- Reranker model
+  - **Implemented**: Cohere cross-encoder for re-scoring initial search candidates
 
 ## Observability
 
-- Retrieval traces
-  - *Not yet implemented* — planned for Stage 4
-- Evaluation datasets
-  - *Not yet implemented* — planned for Stage 4
 - Query analytics
-  - *Not yet implemented* — planned for Stage 4
+  - **Implemented**: Search queries, LLM calls (input/output tokens, estimated cost), latency, and errors logged to local JSONL files via `loguru`
+- Observability dashboard
+  - **Implemented**: Admin `/admin/observability` page reads the JSONL logs and displays them in real time
+- Evaluation datasets
+  - *Not yet implemented* — planned
+- Retrieval traces
+  - *Not yet implemented* — planned
 - Citation inspection
-  - *Not yet implemented* — planned for Stage 4
+  - *Not yet implemented* — planned
 
 ## Deployment
 
