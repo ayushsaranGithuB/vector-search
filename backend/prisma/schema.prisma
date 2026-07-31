@@ -47,6 +47,7 @@ model Project {
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
   sources     Source[]
+  query_logs  QueryLog[]
 
   @@index([slug])
 }
@@ -101,4 +102,30 @@ model IngestionRun {
   updated_at    DateTime        @updatedAt
 
   @@index([source_id, created_at])
+}
+
+enum QueryLogEvent {
+  SEARCH
+  LLM_CALL
+  ERROR
+}
+
+model QueryLog {
+  id              String        @id @default(cuid())
+  project_id      String?
+  project         Project?      @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  event           QueryLogEvent
+  query           String?
+  source_ids      String[]
+  model_slug      String?
+  input_tokens    Int?
+  output_tokens   Int?
+  cost_usd        Float?
+  latency_ms      Int?
+  error_message   String?
+  metadata        Json?         @default("{}")
+  created_at      DateTime      @default(now())
+
+  @@index([project_id, created_at])
+  @@index([event, created_at])
 }

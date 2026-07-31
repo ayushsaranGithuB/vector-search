@@ -45,8 +45,20 @@ async def read_project_sources(slug: str) -> list[SourceOut]:
 
 @router.get("/{slug}/search", response_model=list[SearchResultOut])
 async def search_project(slug: str, q: str) -> list[SearchResultOut]:
+    from app.services.query_logger import QueryLogger
+
     corrected_q = correct_query(q)
-    results = await list_project_search_results(slug, corrected_q)
+    try:
+        results = await list_project_search_results(slug, corrected_q)
+    except Exception as exc:
+        project = await get_project_by_slug(slug)
+        await QueryLogger.log_error(
+            project_id=project.id if project else None,
+            query=corrected_q,
+            error_message=str(exc),
+            metadata={"route": "search", "slug": slug},
+        )
+        raise
     # Attach the corrected query so the frontend can highlight using
     # the corrected terms rather than the original misspelled ones.
     for r in results:
@@ -66,10 +78,19 @@ async def search_project_summary(
     q: str,
     model: str = Query(default="", description="Model slug (e.g. qwen-3-8b, gemini-flash-lite)"),
 ) -> SearchSummaryOut:
+    from app.services.query_logger import QueryLogger
+
+    corrected_q = correct_query(q)
     try:
-        corrected_q = correct_query(q)
         return await summarize_search_results(slug, corrected_q, model_slug=model or None)
     except ValueError as exc:
+        project = await get_project_by_slug(slug)
+        await QueryLogger.log_error(
+            project_id=project.id if project else None,
+            query=corrected_q,
+            error_message=str(exc),
+            metadata={"route": "search_summary", "slug": slug, "model": model},
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
@@ -81,16 +102,25 @@ async def compare_project_summaries(
     model_b: str = Query(default="qwen-3.7-flash", description="Second model slug"),
 ) -> ComparisonSummaryOut:
     """Generate summaries from two models side-by-side for comparison."""
+    from app.services.query_logger import QueryLogger
+
     settings = get_settings()
     if not settings.enable_comparison:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Comparison mode is not enabled. Set ENABLE_COMPARISON=true to use this feature.",
         )
+    corrected_q = correct_query(q)
     try:
-        corrected_q = correct_query(q)
         return await compare_search_summaries(slug, corrected_q, model_a, model_b)
     except ValueError as exc:
+        project = await get_project_by_slug(slug)
+        await QueryLogger.log_error(
+            project_id=project.id if project else None,
+            query=corrected_q,
+            error_message=str(exc),
+            metadata={"route": "compare_summaries", "slug": slug, "model_a": model_a, "model_b": model_b},
+        )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 

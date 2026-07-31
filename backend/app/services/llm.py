@@ -140,9 +140,27 @@ Example: "According to the Motor Vehicles Act 1989, heavy vehicles are defined a
     ]
 
 
+def _estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float | None:
+    """Return estimated USD cost for a given OpenRouter model and token counts.
+
+    Pricing is best-effort; unknown models return None. OpenRouter provides
+    per-model pricing via /api/v1/models, but hard-coding common models avoids
+    an extra network call on every completion.
+    """
+    # Prices are per 1M tokens (input / output).
+    pricing: dict[str, tuple[float, float]] = {
+        "qwen/qwen3.7-flash": (0.0, 0.0),
+    }
+    if model_id not in pricing:
+        return None
+    in_price, out_price = pricing[model_id]
+    return (input_tokens * in_price + output_tokens * out_price) / 1_000_000
+
+
 async def _call_openrouter(
     model_id: str,
     messages: list[dict[str, str]],
+    llm_info: dict[str, Any] | None = None,
 ) -> str | None:
     """Make a single OpenRouter chat completion call."""
     try:
@@ -164,11 +182,19 @@ async def _call_openrouter(
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
+            usage = data.get("usage", {})
+            input_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
+            output_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
+            if llm_info is not None:
+                llm_info["input_tokens"] = input_tokens
+                llm_info["output_tokens"] = output_tokens
+                if input_tokens is not None and output_tokens is not None:
+                    llm_info["cost_usd"] = _estimate_cost(model_id, input_tokens, output_tokens)
             logger.info(
                 "OpenRouter %s — %d input results, %d output tokens",
                 model_id,
                 len(messages),
-                data.get("usage", {}).get("completion_tokens", "?"),
+                output_tokens if output_tokens is not None else "?",
             )
             return content.strip()
 
@@ -187,6 +213,7 @@ async def generate_summary(
     query: str,
     results: list[dict[str, Any]],
     model_slug: str | None = None,
+    llm_info: dict[str, Any] | None = None,
 ) -> str | None:
     """Generate a grounded summary with citations from search results.
 
@@ -194,6 +221,7 @@ async def generate_summary(
         query: The user's search query.
         results: List of search result dicts.
         model_slug: One of the keys in MODEL_REGISTRY. If None, uses the first available model.
+        llm_info: Optional dict to populate with token/cost metadata.
 
     Returns:
         The generated summary text, or None if it failed.
@@ -209,4 +237,4 @@ async def generate_summary(
 
     context = build_context(results)
     messages = _build_messages(query, context)
-    return await _call_openrouter(model_id, messages)
+    return await _call_openrouter(model_id, messages, llm_info=llm_info)

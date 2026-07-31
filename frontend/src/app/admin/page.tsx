@@ -80,6 +80,17 @@ export default async function AdminPage() {
               </CardContent>
             </Card>
           ))}
+          <Card className="border-border/50 transition-colors hover:border-border">
+            <CardHeader>
+              <CardTitle>System Observability</CardTitle>
+              <CardDescription>View query analytics and logs.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/observability">
+                <Button variant="secondary">View Logs</Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

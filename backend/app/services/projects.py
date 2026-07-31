@@ -1,6 +1,7 @@
 ﻿from app.api.schemas import ComparisonSummaryOut, ProjectOut, SearchSummaryOut, SourceOut, SourceStatusLabel, SourceTypeLabel
 from app.db import prisma
 from app.services.pinecone import pinecone_available, query_vectors
+from app.services.query_logger import QueryLogger, timed_llm_call, timed_search
 from app.services.queue import enqueue_ingestion_for_source
 from app.services.reranker import rerank
 
@@ -58,7 +59,10 @@ async def list_project_search_results(slug: str, query: str) -> list[dict]:
     if project is None:
         return []
 
-    return await _fetch_and_rerank(project, query, slug)
+    async with timed_search(project_id=project.id, query=query) as source_ids:
+        results = await _fetch_and_rerank(project, query, slug)
+        source_ids.extend({r["source"] for r in results if r.get("source")})
+        return results
 
 
 def map_project(project) -> ProjectOut:
@@ -239,9 +243,12 @@ async def summarize_search_results(
     # Count unique sources for the generated_from display
     unique_sources = len({r["source"] for r in results})
 
-    summary = await generate_summary(query, results, model_slug=effective_slug)
-    if summary is None:
-        raise ValueError("Failed to generate summary — check that OPENROUTER_API_KEY is configured")
+    async with timed_llm_call(
+        project_id=project.id, query=query, model_slug=effective_slug
+    ) as llm_info:
+        summary = await generate_summary(query, results, model_slug=effective_slug, llm_info=llm_info)
+        if summary is None:
+            raise ValueError("Failed to generate summary — check that OPENROUTER_API_KEY is configured")
 
     return SearchSummaryOut(
         summary=summary,
@@ -282,9 +289,14 @@ async def compare_search_summaries(
     # Run both models in parallel
     import asyncio
 
-    summary_a_task = generate_summary(query, results, model_slug=model_a_slug)
-    summary_b_task = generate_summary(query, results, model_slug=model_b_slug)
-    summaries = await asyncio.gather(summary_a_task, summary_b_task)
+    async with timed_llm_call(
+        project_id=project.id, query=query, model_slug=model_a_slug
+    ) as info_a, timed_llm_call(
+        project_id=project.id, query=query, model_slug=model_b_slug
+    ) as info_b:
+        summary_a_task = generate_summary(query, results, model_slug=model_a_slug, llm_info=info_a)
+        summary_b_task = generate_summary(query, results, model_slug=model_b_slug, llm_info=info_b)
+        summaries = await asyncio.gather(summary_a_task, summary_b_task)
 
     summary_a, summary_b = summaries
 
