@@ -7,5 +7,5 @@
 - [x] Reranking pipeline for improved result quality
 - [x] Query analytics and observability dashboard
 - [ ] Route Cohere through the OpenRouter endpoint
-- [ ] Populate `pinecone_vector_id` on chunks after upsert
+- [x] Populate `pinecone_vector_id` on chunks after upsert
 - [ ] Wire up "Sync Sources" button in admin panel

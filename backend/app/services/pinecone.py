@@ -148,7 +148,11 @@ async def delete_vectors_for_source(source_id: str) -> None:
         logger.info("No chunks found for source %s, nothing to delete from Pinecone", source_id)
         return
 
-    vector_ids = [chunk.id for chunk in chunks]
+    vector_ids = [
+        chunk.pinecone_vector_id or chunk.id
+        for chunk in chunks
+        if chunk.pinecone_vector_id or chunk.id
+    ]
     # Look up the project namespace
     source = await prisma.source.find_unique(where={"id": source_id}, include={"project": True})
     namespace = source.project.slug if source else None

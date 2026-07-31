@@ -10,7 +10,7 @@ from botocore.config import Config
 
 from app.core.config import get_settings
 from app.db import prisma
-from app.services.pinecone import embed_texts, pinecone_available, upsert_vectors
+from app.services.pinecone import embed_texts, pinecone_available, upsert_vectors, delete_vectors_by_ids
 from app.ingestion.pipeline import run_pipeline
 from app.ingestion.models import FetchResult
 from app.ingestion.normalizer import normalize_document
@@ -79,7 +79,19 @@ async def ingest_source(source_id: str) -> None:
         logger.info("URL source: %s", source.source_url)
         object_key = None
 
-    # Clean slate: delete any existing chunks + ingestion runs for this source
+    # Clean slate: delete old Pinecone vectors first, then DB records
+    existing_chunks = await prisma.chunk.find_many(
+        where={"source_id": source.id},
+        select={"pinecone_vector_id": True},
+    )
+    old_vector_ids = [
+        c.pinecone_vector_id for c in existing_chunks if c.pinecone_vector_id
+    ]
+    if old_vector_ids:
+        logger.info("Deleting %d old Pinecone vectors before re-ingestion", len(old_vector_ids))
+        await asyncio.to_thread(
+            delete_vectors_by_ids, old_vector_ids, namespace=source.project.slug
+        )
     await prisma.chunk.delete_many(where={"source_id": source.id})
     await prisma.ingestionrun.delete_many(where={"source_id": source.id})
 
@@ -194,6 +206,14 @@ async def ingest_source(source_id: str) -> None:
             logger.info("Upserting %d vectors to Pinecone namespace=%s ...", len(pinecone_vectors), source.project.slug)
             await asyncio.to_thread(upsert_vectors, pinecone_vectors, namespace=source.project.slug)
             logger.info("Pinecone upsert complete!")
+
+            # Populate pinecone_vector_id on each chunk so we can cross-reference
+            for chunk in created_chunks:
+                await prisma.chunk.update(
+                    where={"id": chunk.id},
+                    data={"pinecone_vector_id": chunk.id},
+                )
+            logger.info("Populated pinecone_vector_id on %d chunks", len(created_chunks))
         else:
             logger.info("Pinecone not available or no chunks, skipping vector upsert")
 
