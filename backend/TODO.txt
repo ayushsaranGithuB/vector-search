@@ -6,6 +6,6 @@
 - [x] skip common words in search highlighting like "a, of, the, why, when..." etc
 - [x] Reranking pipeline for improved result quality
 - [x] Query analytics and observability dashboard
-- [ ] Route Cohere through the OpenRouter endpoint
+- [x] Route Cohere through the OpenRouter endpoint
 - [x] Populate `pinecone_vector_id` on chunks after upsert
 - [ ] Wire up "Sync Sources" button in admin panel
