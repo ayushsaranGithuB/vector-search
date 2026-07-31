@@ -2,11 +2,14 @@
 Reranking pipeline for improved search result quality.
 
 Strategy (in priority order):
-1. Cohere Rerank API — cross-encoder that scores (query, document) pairs.
-   Returns relevance scores that are far more accurate than embedding cosine
-   similarity alone.
-2. Heuristic fallback — lightweight keyword-overlap scoring when no Cohere
-   API key is configured.  Not as good as a cross-encoder but still useful
+1. OpenRouter Rerank API — routes Cohere's `rerank-v3.5` cross-encoder
+   through the OpenRouter endpoint, so only one API key is needed.
+   Returns relevance scores that are far more accurate than embedding
+   cosine similarity alone.
+2. Cohere Rerank API (direct) — fallback when OpenRouter isn't configured
+   but a direct Cohere API key is.
+3. Heuristic fallback — lightweight keyword-overlap scoring when no API
+   key is configured.  Not as good as a cross-encoder but still useful
    for pushing exact keyword matches above purely semantic matches.
 """
 
@@ -51,6 +54,14 @@ async def rerank(
 
     settings = get_settings()
 
+    # 1. OpenRouter rerank (preferred — routes Cohere through the OR endpoint)
+    if settings.openrouter_api_key:
+        try:
+            return await _openrouter_rerank(query, documents, top_n, settings.openrouter_api_key)
+        except Exception:
+            logger.exception("OpenRouter rerank failed, falling back")
+
+    # 2. Direct Cohere rerank (fallback)
     if settings.cohere_api_key:
         try:
             return await _cohere_rerank(query, documents, top_n, settings.cohere_api_key)
@@ -61,8 +72,59 @@ async def rerank(
 
 
 # ---------------------------------------------------------------------------
-# Cohere Rerank
+# OpenRouter Rerank (preferred — routes Cohere through the OR endpoint)
 # ---------------------------------------------------------------------------
+
+_OPENROUTER_RERANK_URL = "https://openrouter.ai/api/v1/rerank"
+
+
+async def _openrouter_rerank(
+    query: str,
+    documents: list[dict[str, Any]],
+    top_n: int,
+    api_key: str,
+) -> list[dict[str, Any]]:
+    """Call the OpenRouter Rerank API, which routes through Cohere rerank-v3.5."""
+    texts = [doc.get("excerpt", "") for doc in documents]
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.post(
+            _OPENROUTER_RERANK_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://vector-search.local",
+            },
+            json={
+                "model": "cohere/rerank-v3.5",
+                "query": query,
+                "documents": texts,
+                "top_n": min(top_n, len(documents)),
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    # Build a lookup: document index → relevance score
+    score_map: dict[int, float] = {}
+    for item in data.get("results", []):
+        idx = item.get("index")
+        if idx is not None:
+            score_map[idx] = item.get("relevance_score", 0.0)
+
+    # Reorder documents by score, attach the new score
+    reranked: list[dict[str, Any]] = []
+    for idx, score in sorted(score_map.items(), key=lambda x: x[1], reverse=True):
+        doc = dict(documents[idx])
+        doc["score"] = round(score, 4)
+        reranked.append(doc)
+
+    logger.info("OpenRouter reranked %d → %d results", len(documents), len(reranked))
+    return reranked
+
+
+# ---------------------------------------------------------------------------
+# Cohere Rerank (direct fallback)
 
 _COHERE_RERANK_URL = "https://api.cohere.com/v2/rerank"
 
