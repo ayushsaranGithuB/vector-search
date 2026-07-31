@@ -75,7 +75,7 @@ This installs all required packages, including:
 | `readability-lxml` | Article extraction from HTML pages |
 | `beautifulsoup4` | HTML cleaning and parsing |
 | `lxml` | XML/HTML parser (dependency of readability and BeautifulSoup) |
-| `honcho` | Run both web server and worker with one command (optional) |
+| `goreman` | Run both web server and worker with one command (optional) |
 
 ### 4) Sync Prisma with Neon
 
@@ -107,13 +107,13 @@ What this means:
 - `app` is the FastAPI instance inside that file
 - `--reload` restarts the server whenever you edit code
 
-### 6) Run both services together with honcho
+### 6) Run both services together with goreman
 
-Instead of running the web server and worker in separate terminals, you can start both at once with `honcho`:
+Instead of running the web server and worker in separate terminals, you can start both at once with `goreman`:
 
 ```bash
-pip install honcho
-honcho start
+go install github.com/mattn/goreman@latest
+goreman start
 ```
 
 This reads the `Procfile` and starts:
@@ -135,7 +135,7 @@ Visit:
 
 ### 8) Run the ingestion worker manually (separate terminal)
 
-If you prefer to run the worker separately instead of using honcho:
+If you prefer to run the worker separately instead of using goreman:
 
 ```bash
 python -m app.services.worker
