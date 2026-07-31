@@ -14,12 +14,13 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
-# Lazy-init globals so we don't connect at import time
+# Lazy-init globals so we don't connect at import time.
 _pinecone_client: PineconeClient | None = None
 _pinecone_index = None
 
 
 def _get_client() -> PineconeClient | None:
+    """Initialise and return the Pinecone client singleton."""
     global _pinecone_client
     if _pinecone_client is None and settings.pinecone_api_key:
         _pinecone_client = PineconeClient(api_key=settings.pinecone_api_key)
@@ -27,6 +28,7 @@ def _get_client() -> PineconeClient | None:
 
 
 def pinecone_available() -> bool:
+    """Check if Pinecone is configured and the client is initialised."""
     return bool(
         settings.pinecone_api_key
         and settings.pinecone_index
@@ -35,6 +37,7 @@ def pinecone_available() -> bool:
 
 
 def _get_index():
+    """Return the Pinecone index handle, initialising it if needed."""
     global _pinecone_index
     if _pinecone_index is None:
         client = _get_client()
@@ -45,7 +48,7 @@ def _get_index():
 
 
 def embed_text(text: str, input_type: str = "passage") -> list[float]:
-    """Embed text using Pinecone Inference."""
+    """Embed a single text using Pinecone Inference."""
     client = _get_client()
     if client is None:
         raise RuntimeError("Pinecone client is not configured")
@@ -59,16 +62,14 @@ def embed_text(text: str, input_type: str = "passage") -> list[float]:
 
 
 async def embed_texts(texts: list[str], input_type: str = "passage") -> list[list[float]]:
-    """Embed multiple texts in one API call using Pinecone Inference (runs sync call in thread).
-    Batches automatically to stay within the model's input limit (96 for multilingual-e5-large).
-    """
+    """Embed multiple texts in parallel, batching to stay within the 96-input limit."""
     import asyncio
 
     client = _get_client()
     if client is None:
         raise RuntimeError("Pinecone client is not configured")
 
-    # Pinecone's multilingual-e5-large has a 96 input limit per request
+    # Pinecone's multilingual-e5-large has a 96 input limit per request.
     batch_size = 96
     all_embeddings: list[list[float]] = [None] * len(texts)  # type: ignore
 
@@ -81,6 +82,7 @@ async def embed_texts(texts: list[str], input_type: str = "passage") -> list[lis
         for i, r in enumerate(result):
             all_embeddings[offset + i] = r["values"]
 
+    # Fire off concurrent batch embedding tasks.
     tasks = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
@@ -91,6 +93,7 @@ async def embed_texts(texts: list[str], input_type: str = "passage") -> list[lis
 
 
 def upsert_vectors(vectors: list[dict], namespace: str | None = None) -> None:
+    """Upsert a batch of vectors to a Pinecone namespace."""
     if not pinecone_available():
         logger.warning("Pinecone unavailable, skipping vector upsert")
         return
@@ -102,6 +105,7 @@ def upsert_vectors(vectors: list[dict], namespace: str | None = None) -> None:
 
 
 async def query_vectors(query: str, top_k: int = 10, namespace: str | None = None) -> list[tuple[str, float]]:
+    """Query Pinecone with a text query and return (chunk_id, score) pairs."""
     if not pinecone_available():
         return []
 
@@ -135,14 +139,12 @@ def delete_vectors_by_ids(vector_ids: list[str], namespace: str | None = None) -
 
 
 async def delete_vectors_for_source(source_id: str) -> None:
-    """Delete all vectors for a given source from Pinecone.
-    Since Pinecone doesn't support deletion by metadata, we need the chunk IDs.
-    This is called after reading the chunks from the DB.
-    """
+    """Delete all Pinecone vectors for a given source using chunk IDs from the DB."""
     import asyncio
 
     from app.db import prisma
 
+    # Fetch chunks to get their Pinecone vector IDs.
     chunks = await prisma.chunk.find_many(where={"source_id": source_id})
     if not chunks:
         logger.info("No chunks found for source %s, nothing to delete from Pinecone", source_id)
@@ -153,7 +155,7 @@ async def delete_vectors_for_source(source_id: str) -> None:
         for chunk in chunks
         if chunk.pinecone_vector_id or chunk.id
     ]
-    # Look up the project namespace
+    # Determine the namespace from the source's project slug.
     source = await prisma.source.find_unique(where={"id": source_id}, include={"project": True})
     namespace = source.project.slug if source else None
 

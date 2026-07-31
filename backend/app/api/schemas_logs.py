@@ -1,7 +1,9 @@
 from pydantic import BaseModel
 from typing import Optional, Any
 
+
 class LogEntry(BaseModel):
+    """A single analytics log entry for the observability dashboard."""
     id: str
     timestamp: str
     event: str

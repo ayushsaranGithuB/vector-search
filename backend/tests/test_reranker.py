@@ -1,9 +1,11 @@
-"""Tests for the reranking pipeline — heuristic fallback and OpenRouter/Cohere integration."""
+"""Tests for the reranking pipeline — heuristic fallback and tokenization."""
 
 from app.services.reranker import _heuristic_rerank, _tokenize
 
 
 class TestTokenize:
+    """Test text tokenization: lowercasing, stop word removal, short token handling."""
+
     def test_lowercases_and_splits(self):
         tokens = _tokenize("Hello World API Test")
         assert "hello" in tokens
@@ -13,14 +15,13 @@ class TestTokenize:
 
     def test_drops_stop_words(self):
         tokens = _tokenize("the and of a an in")
-        # All are stop words, should be empty
         for t in ("the", "and", "of", "a", "an", "in"):
             assert t not in tokens
 
     def test_drops_short_tokens(self):
         tokens = _tokenize("a bc def ghij")
         assert "a" not in tokens  # length 1
-        assert "bc" in tokens  # length 2 — only len 1 is dropped
+        assert "bc" in tokens  # length 2
         assert "def" in tokens  # length 3
         assert "ghij" in tokens  # length 4
 
@@ -38,6 +39,8 @@ class TestTokenize:
 
 
 class TestHeuristicRerank:
+    """Test keyword-overlap reranking: scoring, limits, and edge cases."""
+
     def test_reranks_by_keyword_overlap(self):
         docs = [
             {"excerpt": "The quick brown fox jumps over the lazy dog"},
@@ -46,9 +49,8 @@ class TestHeuristicRerank:
         ]
         result = _heuristic_rerank("fox quick", docs, top_n=3)
 
-        # "fox" and "quick" appear in doc 0 and 2; doc 1 has neither
         assert len(result) == 3
-        # Doc 0 should score highest (2/2 match: "fox" + "quick")
+        # Doc 0 should score highest (2/2 match: "fox" + "quick").
         assert result[0]["score"] >= result[1]["score"]
 
     def test_top_n_limits_results(self):
@@ -69,7 +71,6 @@ class TestHeuristicRerank:
             {"excerpt": "More content here"},
         ]
         result = _heuristic_rerank("a an", docs, top_n=2)
-        # Only stop words in query, so no query tokens — uniform scores
         assert len(result) == 2
         assert result[0]["score"] == 1.0
         assert result[1]["score"] == 1.0

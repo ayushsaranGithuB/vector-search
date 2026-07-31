@@ -1,3 +1,4 @@
+# Tests for upload services: creating sources and uploading to R2 with mocked dependencies.
 import pytest
 from datetime import datetime
 
@@ -11,11 +12,13 @@ from app.services.uploads import (
 
 
 class FakeProject:
+    """Mock project record for testing."""
     id = "project-1"
     slug = "proj-1"
 
 
 class FakeSource:
+    """Mock source record for testing."""
     id = "source-1"
     name = "Test source"
     source_type = "URL"
@@ -33,6 +36,7 @@ class FakeSource:
 
 
 class FakePdfSource(FakeSource):
+    """Mock PDF source record for testing."""
     source_type = "PDF"
     source_url = None
     file_name = "test.pdf"
@@ -40,6 +44,7 @@ class FakePdfSource(FakeSource):
 
 @pytest.mark.asyncio
 async def test_create_upload_for_project_url(monkeypatch):
+    """Creating a URL source should enqueue ingestion."""
     enqueued = {"called": False}
 
     async def fake_find_unique(where):
@@ -75,6 +80,7 @@ async def test_create_upload_for_project_url(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_upload_source_file_to_r2(monkeypatch):
+    """Uploading a PDF source should call R2 put_object with the correct bytes."""
     fake_source = FakePdfSource()
     fake_source.project = FakeProject()
     uploaded = {}

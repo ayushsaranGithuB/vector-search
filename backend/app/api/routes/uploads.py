@@ -12,6 +12,7 @@ router = APIRouter(prefix="/uploads")
 
 @router.post("", response_model=UploadCreateOut, status_code=status.HTTP_201_CREATED)
 async def create_upload(payload: SourceUploadCreateInput) -> UploadCreateOut:
+    """Create a new source and optionally generate a presigned upload URL for PDFs."""
     try:
         return await create_upload_for_project(payload)
     except ValueError as exc:
@@ -20,6 +21,7 @@ async def create_upload(payload: SourceUploadCreateInput) -> UploadCreateOut:
 
 @router.post("/{source_id}/finalize", response_model=UploadCreateOut, status_code=status.HTTP_200_OK)
 async def finalize_upload(source_id: str) -> UploadCreateOut:
+    """Finalize a PDF upload after the file has been uploaded to R2."""
     try:
         source = await finalize_uploaded_source(source_id)
         return UploadCreateOut(source=source, uploadUrl=None, r2ObjectKey=None)
@@ -29,6 +31,7 @@ async def finalize_upload(source_id: str) -> UploadCreateOut:
 
 @router.post("/{source_id}/upload", response_model=UploadCreateOut, status_code=status.HTTP_200_OK)
 async def upload_file(source_id: str, file: UploadFile = File(...)) -> UploadCreateOut:
+    """Directly upload a PDF file to R2 and finalize the source."""
     try:
         contents = await file.read()
         await upload_source_file_to_r2(source_id, contents, file.content_type or "application/pdf", file.filename or "upload.pdf")

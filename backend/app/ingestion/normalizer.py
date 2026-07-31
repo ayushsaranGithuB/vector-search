@@ -36,19 +36,19 @@ def normalize_document(document: Document) -> Document:
     """
     content = document.content
 
-    # Normalize Unicode whitespace (non-breaking spaces, thin spaces, etc.)
+    # Normalize Unicode whitespace (non-breaking spaces, thin spaces, etc.).
     content = re.sub(r"[\u00a0\u2000-\u200a\u202f\u205f\u3000]", " ", content)
 
-    # Split into lines, strip each, and filter out empty/punctuation-only lines
+    # Split into lines, strip each, and filter out empty/punctuation-only lines.
     lines = content.split("\n")
     cleaned_lines: list[str] = []
     consecutive_blanks = 0
-    max_consecutive_blanks = 1  # at most one blank line between paragraphs
+    max_consecutive_blanks = 1  # at most one blank line between paragraphs.
 
     for line in lines:
         stripped = line.strip()
 
-        # Skip lines that are only punctuation or whitespace
+        # Skip lines that are only punctuation or whitespace.
         if stripped and re.match(r"^[^\w\s]+$", stripped):
             continue
 
@@ -60,7 +60,7 @@ def normalize_document(document: Document) -> Document:
             consecutive_blanks = 0
             cleaned_lines.append(stripped)
 
-    # Remove leading/trailing blank lines
+    # Remove leading/trailing blank lines.
     while cleaned_lines and cleaned_lines[0] == "":
         cleaned_lines.pop(0)
     while cleaned_lines and cleaned_lines[-1] == "":

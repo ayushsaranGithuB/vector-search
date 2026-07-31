@@ -4,6 +4,8 @@ from app.services.projects import format_bytes, source_status_label, source_type
 
 
 class TestFormatBytes:
+    """Test byte size formatting for display."""
+
     def test_none(self):
         assert format_bytes(None) == "Pending"
 
@@ -23,6 +25,8 @@ class TestFormatBytes:
 
 
 class TestSourceStatusLabel:
+    """Test mapping of DB status enums to display labels."""
+
     def test_processed(self):
         assert source_status_label("PROCESSED") == "processed"
 
@@ -43,6 +47,8 @@ class TestSourceStatusLabel:
 
 
 class TestSourceTypeLabel:
+    """Test mapping of DB source type to display labels."""
+
     def test_pdf(self):
         assert source_type_label("PDF") == "pdf"
 

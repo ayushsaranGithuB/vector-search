@@ -7,7 +7,7 @@ import re
 
 from spellchecker import SpellChecker
 
-# Lazy-initialised singleton — loading the dictionary is expensive (~1-2 s)
+# Lazy-initialised singleton — loading the dictionary is expensive (~1-2 s).
 _spell: SpellChecker | None = None
 
 
@@ -42,28 +42,27 @@ def correct_query(query: str) -> str:
 
     spell = _get_spell()
 
-    # Split on word boundaries while preserving whitespace / punctuation
+    # Split on word boundaries while preserving whitespace / punctuation.
     tokens = re.split(r"(\s+|[^\w\s]+)", query)
     corrected: list[str] = []
 
     for token in tokens:
-        # Only attempt correction on pure alphabetic tokens of length >= 3
+        # Only attempt correction on pure alphabetic tokens of length >= 3.
         if re.fullmatch(r"[a-zA-Z]{3,}", token):
             lower = token.lower()
+            # Skip domain terms and known words.
             if lower in _PRESERVE_WORDS:
                 corrected.append(token)
                 continue
 
-            # If the word is already known, skip it
             known = spell.known([lower])
             if known:
                 corrected.append(token)
                 continue
 
-            # Otherwise, get the best correction
+            # Otherwise, get the best correction, preserving case.
             candidate = spell.correction(lower)
             if candidate is not None and candidate != lower:
-                # Preserve original capitalisation
                 if token[0].isupper():
                     candidate = candidate[0].upper() + candidate[1:]
                 corrected.append(candidate)

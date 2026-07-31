@@ -12,6 +12,8 @@ from app.services.llm import (
 
 
 class TestModelRegistry:
+    """Verify the model registry returns correct slugs and labels."""
+
     def test_list_models_returns_slugs_and_labels(self):
         models = list_models()
         assert len(models) >= 1
@@ -26,6 +28,8 @@ class TestModelRegistry:
 
 
 class TestBuildContext:
+    """Test the context builder that groups chunks by source."""
+
     def test_merges_chunks_from_same_source(self):
         results = [
             {"title": "Doc A", "source": "Source1", "citation": "cite1", "source_url": "https://a.com", "excerpt": "Content 1"},
@@ -33,7 +37,7 @@ class TestBuildContext:
             {"title": "Doc B", "source": "Source2", "citation": "cite2", "source_url": "https://b.com", "excerpt": "Content 3"},
         ]
         context = build_context(results)
-        # Source1's excerpts should be merged into one entry
+        # Source1's excerpts should be merged into one entry.
         assert "[1]" in context
         assert "[2]" in context
         assert "Content 1" in context
@@ -62,6 +66,8 @@ class TestBuildContext:
 
 
 class TestBuildMessages:
+    """Verify message formatting for the LLM chat completion."""
+
     def test_includes_system_and_user_role(self):
         messages = _build_messages("test query", "some context")
         assert len(messages) == 2
@@ -78,9 +84,10 @@ class TestBuildMessages:
 
 
 class TestEstimateCost:
+    """Test cost estimation for known and unknown models."""
+
     def test_returns_cost_for_known_model(self):
         cost = _estimate_cost("qwen/qwen3.7-flash", 1000, 500)
-        # (1000 * 0.03 + 500 * 0.13) / 1_000_000
         expected = (1000 * 0.03 + 500 * 0.13) / 1_000_000
         assert cost == pytest.approx(expected, rel=1e-6)
 

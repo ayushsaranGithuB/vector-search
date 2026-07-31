@@ -118,7 +118,7 @@ async def fetch_url(
         logger.warning("Non-OK status %d for %s", response.status_code, url)
         raise FetchError(url, status_code=response.status_code)
 
-    # Determine effective content type from the Content-Type header
+    # Determine effective content type and encoding from the response headers.
     raw_content_type = response.headers.get("content-type", "")
     effective_content_type = raw_content_type.split(";")[0].strip().lower()
     encoding = response.encoding or "utf-8"
@@ -132,7 +132,7 @@ async def fetch_url(
     )
 
     return FetchResult(
-        url=str(response.url),  # final URL after redirects
+        url=str(response.url),  # final URL after redirects.
         status_code=response.status_code,
         content_type=effective_content_type,
         body=response.content,

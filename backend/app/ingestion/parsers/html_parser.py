@@ -47,7 +47,7 @@ class HTMLParser(BaseParser):
                 "Missing dependencies: install 'readability-lxml' and 'beautifulsoup4'",
             ) from exc
 
-        # Decode body to string — readability-lxml expects str, not bytes
+        # Decode body to string — readability-lxml expects str, not bytes.
         try:
             html_str = body.decode(encoding)
         except (LookupError, UnicodeDecodeError):
@@ -59,10 +59,9 @@ class HTMLParser(BaseParser):
         # --- Step 2: Use readability-lxml to extract the main article ---
         summary_html = None
         try:
-            # Wrap in a proper document if readability struggles with partial HTML
             doc = readability.Document(html_str)
             summary_html = doc.summary()
-            # Use readability's title detection as fallback
+            # Use readability's title detection as fallback.
             readability_title = doc.title()
             if title is None and readability_title:
                 title = readability_title
@@ -74,10 +73,10 @@ class HTMLParser(BaseParser):
         if not summary_html or not summary_html.strip():
             try:
                 soup = bs4.BeautifulSoup(html_str, "lxml")
-                # Remove unwanted elements
+                # Remove unwanted elements (scripts, nav, etc.).
                 for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript", "form"]):
                     tag.decompose()
-                # Try to find a main content area, or fall back to body
+                # Try to find a main content area, or fall back to body.
                 main = soup.find("article") or soup.find("main") or soup.find("body") or soup
                 content = main.get_text(separator="\n", strip=True)
                 if not content.strip():
@@ -109,11 +108,11 @@ class HTMLParser(BaseParser):
         except Exception as exc:
             raise ParserError(fetch_result.content_type, f"BeautifulSoup parsing failed: {exc}") from exc
 
-        # Remove unwanted elements
+        # Remove unwanted elements from the article HTML.
         for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript", "form"]):
             tag.decompose()
 
-        # Extract clean text
+        # Extract clean text from the cleaned article.
         content = soup.get_text(separator="\n", strip=True)
 
         if not content.strip():
@@ -124,7 +123,7 @@ class HTMLParser(BaseParser):
             title, len(content), url,
         )
 
-        # --- Step 5: Build metadata ---
+        # --- Step 5: Build metadata with source domain and parser info ---
         metadata: dict = {
             "source_domain": urlparse(url).netloc,
             "charset": encoding,
@@ -147,15 +146,15 @@ def _extract_title(body: bytes, encoding: str, fallback_url: str) -> str | None:
         soup = bs4.BeautifulSoup(body, "lxml", from_encoding=encoding)
     except Exception:
         return None
+    # Try <title> first, then fall back to <h1>.
     title_tag = soup.find("title")
     if title_tag and title_tag.get_text(strip=True):
         return title_tag.get_text(strip=True)
-    # Fallback: try <h1>
     h1 = soup.find("h1")
     if h1 and h1.get_text(strip=True):
         return h1.get_text(strip=True)
     return None
 
 
-# Auto-register
+# Auto-register this parser with the global parser registry.
 register_parser(HTMLParser())

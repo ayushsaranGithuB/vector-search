@@ -1,3 +1,4 @@
+# Tests for the ingestion chunker: overlapping chunks, edge cases, and token counting.
 import pytest
 
 from app.ingestion.chunker import chunk_document
@@ -5,6 +6,7 @@ from app.ingestion.models import Document
 
 
 def test_chunk_document_creates_overlapping_chunks():
+    """Verify that chunker creates overlapping chunks correctly."""
     doc = Document(
         title="Test",
         content="a" * 2500,
@@ -21,6 +23,7 @@ def test_chunk_document_creates_overlapping_chunks():
 
 
 def test_chunk_document_empty():
+    """Empty document should produce no chunks."""
     doc = Document(
         title="Empty",
         content="",
@@ -32,6 +35,7 @@ def test_chunk_document_empty():
 
 
 def test_chunk_document_single_paragraph():
+    """Small document should produce a single chunk."""
     doc = Document(
         title="Small",
         content="Hello world. This is a small document.",

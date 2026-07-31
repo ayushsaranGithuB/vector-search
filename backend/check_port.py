@@ -13,6 +13,7 @@ DEFAULT_PORT = 8000
 
 def check_port(host: str, port: int) -> bool:
     """Return True if the port is available (not in use)."""
+    # Attempt a TCP connection; if it fails the port is free.
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(2)
         result = sock.connect_ex((host, port))
@@ -20,8 +21,10 @@ def check_port(host: str, port: int) -> bool:
 
 
 def main() -> None:
+    # Read port from CLI arg or fall back to the default.
     port = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PORT
 
+    # Report result and exit with appropriate code.
     if check_port("127.0.0.1", port):
         print(f"[OK] Port {port} is available.")
         sys.exit(0)

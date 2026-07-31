@@ -1,3 +1,4 @@
+# Tests for the fetch-title endpoint: title extraction from HTML, non-HTML, and error cases.
 import pytest
 from httpx import AsyncClient, ASGITransport
 

@@ -14,6 +14,8 @@ from app.ingestion.parsers.base import get_parser_for_content_type
 
 
 class TestNormalizer:
+    """Test document normalization: blank lines, punctuation, Unicode whitespace."""
+
     def test_collapses_extra_blank_lines(self):
         doc = Document(
             title="Test",
@@ -69,6 +71,8 @@ class TestNormalizer:
 
 
 class TestChunker:
+    """Test document chunking: size limits, overlap, and edge cases."""
+
     def test_single_chunk_for_small_document(self):
         doc = Document(
             title="Small",
@@ -89,7 +93,6 @@ class TestChunker:
         )
         chunks = chunk_document(doc, chunk_size=1000, chunk_overlap=200)
         assert len(chunks) == 4
-        # Each chunk content should be non-empty
         for c in chunks:
             assert len(c.content) > 0
 
@@ -131,6 +134,8 @@ class TestChunker:
 
 
 class TestParserRegistry:
+    """Test that parsers are correctly registered for their MIME types."""
+
     def test_get_parser_for_html(self):
         parser = get_parser_for_content_type("text/html")
         assert parser is not None
@@ -159,6 +164,8 @@ class TestParserRegistry:
 
 
 class TestPDFParser:
+    """Test PDF parser error handling for empty and invalid input."""
+
     @pytest.mark.asyncio
     async def test_parse_empty_body_raises_error(self):
         parser = PDFParser()
@@ -194,6 +201,8 @@ class TestPDFParser:
 
 
 class TestHTMLParser:
+    """Test HTML parser error handling for empty body."""
+
     @pytest.mark.asyncio
     async def test_parse_empty_body_raises_error(self):
         parser = HTMLParser()
@@ -211,6 +220,7 @@ class TestHTMLParser:
 
     @pytest.mark.asyncio
     async def test_parse_simple_html(self):
+        """HTML parser should extract title and article text from simple HTML."""
         parser = HTMLParser()
         html = b"<html><head><title>Test Page</title></head><body><article><p>Hello world</p></article></body></html>"
         fetch_result = FetchResult(
@@ -228,6 +238,7 @@ class TestHTMLParser:
 
     @pytest.mark.asyncio
     async def test_parse_html_without_title(self):
+        """HTML without a title should fall back to h1 or readability title."""
         parser = HTMLParser()
         html = b"<html><body><h1>Header Title</h1><p>Content here</p></body></html>"
         fetch_result = FetchResult(
@@ -238,12 +249,12 @@ class TestHTMLParser:
             headers={},
         )
         doc = await parser.parse(fetch_result)
-        # Should fall back to h1 or readability title
         assert doc.title is not None
         assert "Content here" in doc.content
 
     @pytest.mark.asyncio
     async def test_parse_strips_script_and_style(self):
+        """HTML parser should remove script/style/nav elements from content."""
         parser = HTMLParser()
         html = b"""
         <html><head><title>Clean</title></head>
@@ -273,6 +284,8 @@ class TestHTMLParser:
 
 
 class TestFetcher:
+    """Test fetcher error handling for HTTP errors and timeouts."""
+
     @pytest.mark.asyncio
     async def test_fetch_url_http_error(self):
         from app.ingestion.fetcher import fetch_url, FetchError
@@ -284,7 +297,7 @@ class TestFetcher:
     async def test_fetch_url_timeout(self):
         from app.ingestion.fetcher import fetch_url, FetchTimeoutError
 
-        # This should trigger a timeout quickly
+        # This should trigger a timeout quickly.
         with pytest.raises(FetchTimeoutError, match="timed out"):
             await fetch_url("https://10.255.255.1/", timeout=0.1)
 

@@ -7,11 +7,13 @@ from app.services.reranker import rerank
 
 
 async def list_projects() -> list[ProjectOut]:
+    """Return all projects with their sources, sorted by creation date."""
     records = await prisma.project.find_many(include={"sources": True}, order={"created_at": "asc"})
     return [map_project(project) for project in records]
 
 
 async def get_project_by_slug(slug: str) -> ProjectOut | None:
+    """Look up a single project by its URL slug."""
     record = await prisma.project.find_unique(where={"slug": slug}, include={"sources": True})
     if record is None:
         return None
@@ -19,6 +21,7 @@ async def get_project_by_slug(slug: str) -> ProjectOut | None:
 
 
 async def list_sources_for_project(slug: str) -> list[SourceOut]:
+    """Return all sources for a project, newest first."""
     project = await prisma.project.find_unique(where={"slug": slug}, include={"sources": True})
     if project is None:
         return []
@@ -26,6 +29,7 @@ async def list_sources_for_project(slug: str) -> list[SourceOut]:
 
 
 async def create_source_for_project(slug: str, payload) -> SourceOut:
+    """Create a new source for a project and enqueue ingestion for URL sources."""
     project = await prisma.project.find_unique(where={"slug": slug})
     if project is None:
         raise ValueError("Project not found")
@@ -48,6 +52,7 @@ async def create_source_for_project(slug: str, payload) -> SourceOut:
         }
     )
 
+    # URL sources are ingested immediately; PDFs wait for file upload.
     if normalized_type == "URL":
         await enqueue_ingestion_for_source(source.id)
 
@@ -55,6 +60,7 @@ async def create_source_for_project(slug: str, payload) -> SourceOut:
 
 
 async def list_project_search_results(slug: str, query: str) -> list[dict]:
+    """Search a project's chunks, re-rank results, and return formatted output."""
     project = await prisma.project.find_unique(where={"slug": slug})
     if project is None:
         return []
@@ -66,6 +72,7 @@ async def list_project_search_results(slug: str, query: str) -> list[dict]:
 
 
 def map_project(project) -> ProjectOut:
+    """Map a Prisma project record to the API output schema."""
     sources = sorted(project.sources, key=lambda item: item.created_at, reverse=True)
     return ProjectOut(
         slug=project.slug,
@@ -77,6 +84,7 @@ def map_project(project) -> ProjectOut:
 
 
 def map_source(source) -> SourceOut:
+    """Map a Prisma source record to the API output schema."""
     return SourceOut(
         id=source.id,
         name=source.name,
@@ -91,6 +99,7 @@ def map_source(source) -> SourceOut:
 
 
 def project_status_label(status: object) -> str:
+    """Convert a DB status enum to a human-readable label."""
     value = enum_value(status)
     if value == "LIVE_DEMO":
         return "Live"
@@ -100,11 +109,13 @@ def project_status_label(status: object) -> str:
 
 
 def source_type_label(source_type: object) -> SourceTypeLabel:
+    """Map a DB source_type enum to a display label."""
     value = enum_value(source_type)
     return "pdf" if value == "PDF" else "url"
 
 
 def source_status_label(status: object) -> SourceStatusLabel:
+    """Map a DB status enum to a display label, defaulting to 'queued'."""
     value = enum_value(status)
     if value == "PROCESSED":
         return "processed"
@@ -118,6 +129,7 @@ def source_status_label(status: object) -> SourceStatusLabel:
 
 
 def format_bytes(size_bytes: int | None) -> str:
+    """Format a byte count into a human-readable string (e.g., '2.0 KB')."""
     if size_bytes is None:
         return "Pending"
     if size_bytes < 1024:
@@ -128,6 +140,7 @@ def format_bytes(size_bytes: int | None) -> str:
 
 
 def enum_value(value: object) -> str:
+    """Extract the string value from an enum or return the string representation."""
     return getattr(value, "value", str(value))
 
 
@@ -139,9 +152,10 @@ async def _fetch_and_rerank(project, query: str, slug: str) -> list[dict]:
 
     settings = get_settings()
 
-    # Fetch more candidates than we need — the reranker will pick the best
+    # Fetch more candidates than we need — the reranker will pick the best.
     fetch_k = settings.rerank_top_k
 
+    # Try Pinecone vector search first, fall back to keyword search.
     chunks: list = []
     if query and pinecone_available():
         try:
@@ -157,6 +171,7 @@ async def _fetch_and_rerank(project, query: str, slug: str) -> list[dict]:
         except Exception:
             chunks = []
 
+    # Fall back to keyword search if Pinecone returned nothing.
     if not chunks:
         chunks = await prisma.chunk.find_many(
             where={
@@ -167,11 +182,13 @@ async def _fetch_and_rerank(project, query: str, slug: str) -> list[dict]:
             take=10,
         )
 
-    # Build result dicts from chunks
+    # Build result dicts from chunks with excerpt highlighting.
     results: list[dict] = []
     for chunk in chunks:
         source = await prisma.source.find_unique(where={"id": chunk.source_id})
         source_name = source.name if source is not None else "Unknown source"
+
+        # Build excerpt with context around the first matching query term.
         excerpt = chunk.content
         if query:
             lower_query = query.lower()
@@ -182,6 +199,7 @@ async def _fetch_and_rerank(project, query: str, slug: str) -> list[dict]:
                 end = min(len(chunk.content), position + 100)
                 excerpt = f"...{chunk.content[start:end].strip()}..."
 
+        # Resolve the source URL (original URL or R2 public URL for PDFs).
         source_url: str | None = None
         if source is not None:
             if source.source_type == "URL":
@@ -201,12 +219,12 @@ async def _fetch_and_rerank(project, query: str, slug: str) -> list[dict]:
             "citation": f"chunk {chunk.chunk_index}",
         })
 
-    # Re-rank for better relevance ordering
+    # Re-rank for better relevance ordering.
     if results and query:
         try:
             results = await rerank(query, results, top_n=10)
         except Exception:
-            pass  # keep original ordering on rerank failure
+            pass  # keep original ordering on rerank failure.
 
     return results
 
@@ -236,7 +254,7 @@ async def summarize_search_results(
     if not results:
         raise ValueError("No results found to summarize")
 
-    # Resolve which model to use
+    # Resolve which model to use, defaulting to the first registered model.
     effective_slug = model_slug if model_slug in MODEL_REGISTRY else next(iter(MODEL_REGISTRY))
     model_info = MODEL_REGISTRY[effective_slug]
 

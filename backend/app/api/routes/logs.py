@@ -10,6 +10,7 @@ router = APIRouter()
 
 
 def _read_logs(limit: int, event_filter: str | None) -> list[dict[str, Any]]:
+    """Parse the JSONL log file and return recent entries, optionally filtered by event type."""
     if not QUERY_LOG_FILE.exists():
         return []
 
@@ -49,7 +50,7 @@ def _read_logs(limit: int, event_filter: str | None) -> list[dict[str, Any]]:
                 }
             )
 
-    # Most recent first.
+    # Return most recent entries first, capped at the requested limit.
     logs.reverse()
     return logs[:limit]
 
@@ -59,4 +60,5 @@ async def get_logs(
     limit: int = Query(default=100, ge=1, le=500),
     event: str | None = Query(default=None),
 ):
+    """Return analytics log entries (search, LLM calls, errors) for the observability dashboard."""
     return _read_logs(limit=limit, event_filter=event)

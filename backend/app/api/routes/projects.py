@@ -27,11 +27,13 @@ router = APIRouter(prefix="/projects")
 
 @router.get("", response_model=list[ProjectOut])
 async def read_projects() -> list[ProjectOut]:
+    """List all projects with their sources."""
     return await list_projects()
 
 
 @router.get("/{slug}", response_model=ProjectOut)
 async def read_project(slug: str) -> ProjectOut:
+    """Get a single project by its slug."""
     project = await get_project_by_slug(slug)
     if project is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
@@ -40,11 +42,13 @@ async def read_project(slug: str) -> ProjectOut:
 
 @router.get("/{slug}/sources", response_model=list[SourceOut])
 async def read_project_sources(slug: str) -> list[SourceOut]:
+    """List all sources for a project."""
     return await list_sources_for_project(slug)
 
 
 @router.get("/{slug}/search", response_model=list[SearchResultOut])
 async def search_project(slug: str, q: str) -> list[SearchResultOut]:
+    """Search a project's indexed content. Query is typo-corrected before searching."""
     from app.services.query_logger import QueryLogger
 
     corrected_q = correct_query(q)
@@ -78,6 +82,7 @@ async def search_project_summary(
     q: str,
     model: str = Query(default="", description="Model slug (e.g. qwen-3-8b, gemini-flash-lite)"),
 ) -> SearchSummaryOut:
+    """Generate an LLM-grounded summary of search results for a query."""
     from app.services.query_logger import QueryLogger
 
     corrected_q = correct_query(q)
@@ -126,6 +131,7 @@ async def compare_project_summaries(
 
 @router.post("/{slug}/sources", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
 async def add_project_source(slug: str, payload: SourceCreateInput) -> SourceOut:
+    """Create a new source for a project and enqueue it for ingestion."""
     try:
         return await create_source_for_project(slug, payload)
     except ValueError as exc:

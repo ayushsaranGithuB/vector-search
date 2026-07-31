@@ -20,10 +20,10 @@ from app.services.storage import build_r2_object_key
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Ensure stdout is line-buffered even when piped (e.g. under goreman)
+# Ensure stdout is line-buffered even when piped (e.g. under goreman).
 sys.stdout.reconfigure(line_buffering=True)
 
-# Ensure the logger actually prints to stdout
+# Ensure the logger actually prints to stdout.
 if not logger.handlers:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
@@ -33,6 +33,7 @@ if not logger.handlers:
 
 
 def get_r2_client():
+    """Return a boto3 S3 client configured for Cloudflare R2."""
     return boto3.client(
         "s3",
         endpoint_url=settings.r2_base_endpoint,
@@ -44,6 +45,7 @@ def get_r2_client():
 
 
 async def download_source_from_r2(object_key: str) -> bytes:
+    """Download a PDF file from Cloudflare R2 as raw bytes."""
     client = get_r2_client()
 
     def get_object_bytes() -> bytes:
@@ -54,6 +56,7 @@ async def download_source_from_r2(object_key: str) -> bytes:
 
 
 async def ingest_source(source_id: str) -> None:
+    """Ingest a single source: fetch, parse, chunk, embed, and upsert to Pinecone."""
     logger.info("Starting ingestion for source_id=%s", source_id)
 
     # --- Idempotency & pre-checks ---
@@ -79,7 +82,7 @@ async def ingest_source(source_id: str) -> None:
         logger.info("URL source: %s", source.source_url)
         object_key = None
 
-    # Clean slate: delete old Pinecone vectors first, then DB records
+    # Clean slate: delete old Pinecone vectors first, then DB records.
     existing_chunks = await prisma.chunk.find_many(
         where={"source_id": source.id},
         select={"pinecone_vector_id": True},
@@ -99,12 +102,13 @@ async def ingest_source(source_id: str) -> None:
         where={"id": source.id},
         data={"status": "PROCESSING"},
     )
+    # Create a new ingestion run record.
     await prisma.ingestionrun.create(
         data={"source_id": source.id, "status": "RUNNING", "started_at": datetime.utcnow()},
     )
     logger.info("Source status updated to PROCESSING")
 
-    # Periodic keepalive to prevent Neon pooler from dropping the connection
+    # Periodic keepalive to prevent Neon pooler from dropping the connection.
     async def _keepalive():
         while True:
             await asyncio.sleep(15)
@@ -146,7 +150,7 @@ async def ingest_source(source_id: str) -> None:
             file_bytes = await download_source_from_r2(object_key)
             logger.info("Downloaded %d bytes from R2", len(file_bytes))
 
-            # Reuse the PDF parser by constructing a minimal FetchResult
+            # Reuse the PDF parser by constructing a minimal FetchResult.
             from app.ingestion.parsers.pdf_parser import PDFParser
 
             fetch_result = FetchResult(
@@ -169,7 +173,7 @@ async def ingest_source(source_id: str) -> None:
 
         logger.info("Text split into %d chunks", len(chunks))
 
-        # Create all chunks in DB first
+        # Create all chunks in DB first, then embed and upsert to Pinecone.
         created_chunks = []
         for chunk in chunks:
             db_chunk = await prisma.chunk.create(
@@ -183,7 +187,7 @@ async def ingest_source(source_id: str) -> None:
             created_chunks.append(db_chunk)
         logger.info("Created %d chunks in database", len(created_chunks))
 
-        # Batch-embed and upsert to Pinecone
+        # Batch-embed and upsert to Pinecone.
         if pinecone_available() and created_chunks:
             logger.info("Pinecone is available, generating embeddings for %d chunks...", len(created_chunks))
             contents = [c.content for c in created_chunks]
@@ -207,7 +211,7 @@ async def ingest_source(source_id: str) -> None:
             await asyncio.to_thread(upsert_vectors, pinecone_vectors, namespace=source.project.slug)
             logger.info("Pinecone upsert complete!")
 
-            # Populate pinecone_vector_id on each chunk so we can cross-reference
+            # Populate pinecone_vector_id on each chunk so we can cross-reference.
             for chunk in created_chunks:
                 await prisma.chunk.update(
                     where={"id": chunk.id},
@@ -218,6 +222,7 @@ async def ingest_source(source_id: str) -> None:
             logger.info("Pinecone not available or no chunks, skipping vector upsert")
 
         keepalive_task.cancel()
+        # Mark the source as processed with updated metadata.
         await prisma.source.update(
             where={"id": source.id},
             data={
@@ -237,6 +242,7 @@ async def ingest_source(source_id: str) -> None:
 
     except Exception as exc:
         keepalive_task.cancel()
+        # On failure, mark the source as FAILED so it can be retried manually.
         logger.error("Ingestion failed for source '%s': %s", source.name, exc, exc_info=True)
         await prisma.source.update(
             where={"id": source.id},
@@ -250,6 +256,7 @@ async def ingest_source(source_id: str) -> None:
 
 
 async def consume_ingestion_queue() -> None:
+    """Listen for ingestion messages on the CloudAMQP queue and process each source."""
     logger.info("Connecting to CloudAMQP queue...")
     connection = await aio_pika.connect_robust(settings.cloudamqp_url)
     async with connection:
@@ -259,6 +266,7 @@ async def consume_ingestion_queue() -> None:
         await queue.bind(exchange, routing_key="source.ingest")
         logger.info("Worker is listening for ingestion messages on 'ingestion.queue'...")
 
+        # Process messages one at a time; acknowledge on completion.
         async with queue.iterator() as queue_iter:
             async for message in queue_iter:
                 async with message.process():
@@ -269,6 +277,7 @@ async def consume_ingestion_queue() -> None:
                         try:
                             await ingest_source(source_id)
                         except Exception:
+                            # Acknowledge on failure too — no infinite retries.
                             logger.exception(
                                 "Ingestion failed for source_id=%s — message acknowledged (won't retry)",
                                 source_id,

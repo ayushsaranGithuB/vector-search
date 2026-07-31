@@ -15,6 +15,7 @@ settings = get_settings()
 
 
 def get_r2_client():
+    """Return a boto3 S3 client configured for Cloudflare R2."""
     return boto3.client(
         "s3",
         endpoint_url=settings.r2_base_endpoint,
@@ -26,11 +27,13 @@ def get_r2_client():
 
 
 def build_r2_object_key(project_slug: str, source_id: str, file_name: str) -> str:
+    """Build a unique R2 object key for a source file within a project."""
     encoded_name = quote(file_name, safe="")
     return f"projects/{project_slug}/sources/{source_id}/{encoded_name}"
 
 
 def generate_presigned_upload_url(object_key: str) -> str:
+    """Generate a presigned URL for direct browser-to-R2 PDF upload."""
     client = get_r2_client()
     return client.generate_presigned_url(
         ClientMethod="put_object",
@@ -49,6 +52,7 @@ async def upload_source_file_to_r2(
     content_type: str,
     file_name: str,
 ) -> None:
+    """Upload source file bytes to R2 under the project's object key prefix."""
     source = await prisma.source.find_unique(where={"id": source_id}, include={"project": True})
     if source is None:
         raise ValueError("Source not found")
@@ -64,10 +68,13 @@ async def upload_source_file_to_r2(
 
 
 async def create_upload_for_project(payload: SourceUploadCreateInput) -> UploadCreateOut:
+    """Create a new source and optionally generate a presigned upload URL for PDFs."""
+    # Look up the project by slug.
     project = await prisma.project.find_unique(where={"slug": payload.project})
     if project is None:
         raise ValueError("Project not found")
 
+    # Validate the source type.
     normalized_type = payload.type.upper()
     if normalized_type not in {"PDF", "URL"}:
         raise ValueError("Invalid source type")
@@ -75,6 +82,7 @@ async def create_upload_for_project(payload: SourceUploadCreateInput) -> UploadC
     if normalized_type == "PDF" and not payload.file_name:
         raise ValueError("fileName is required for PDF uploads")
 
+    # Create the source record in the database.
     source = await prisma.source.create(
         data={
             "project_id": project.id,
@@ -92,12 +100,14 @@ async def create_upload_for_project(payload: SourceUploadCreateInput) -> UploadC
         }
     )
 
+    # For PDFs, generate a presigned upload URL for the frontend.
     upload_url = None
     r2_object_key = None
     if normalized_type == "PDF":
         r2_object_key = build_r2_object_key(project.slug, source.id, payload.file_name)
         upload_url = generate_presigned_upload_url(r2_object_key)
 
+    # For URLs, enqueue immediately for ingestion.
     if normalized_type == "URL":
         await enqueue_ingestion_for_source(source.id)
 
@@ -109,6 +119,7 @@ async def create_upload_for_project(payload: SourceUploadCreateInput) -> UploadC
 
 
 async def finalize_uploaded_source(source_id: str) -> SourceOut:
+    """After a PDF upload completes, verify the file in R2 and enqueue for ingestion."""
     source = await prisma.source.find_unique(
         where={"id": source_id},
         include={"project": True},
@@ -122,6 +133,7 @@ async def finalize_uploaded_source(source_id: str) -> SourceOut:
     if not source.file_name:
         raise ValueError("PDF source is missing file_name metadata")
 
+    # Verify the uploaded file exists in R2.
     object_key = build_r2_object_key(source.project.slug, source.id, source.file_name)
     client = get_r2_client()
     try:
@@ -129,6 +141,7 @@ async def finalize_uploaded_source(source_id: str) -> SourceOut:
     except ClientError as error:
         raise ValueError("Uploaded file not found in R2") from error
 
+    # Update source with the actual file size and enqueue for ingestion.
     size_bytes = int(metadata.get("ContentLength", 0))
     updated_source = await prisma.source.update(
         where={"id": source_id},

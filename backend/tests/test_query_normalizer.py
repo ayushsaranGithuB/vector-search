@@ -4,6 +4,8 @@ from app.services.query_normalizer import correct_query
 
 
 class TestCorrectQuery:
+    """Test typo correction, domain term preservation, and edge cases."""
+
     def test_corrects_obvious_typo(self):
         result = correct_query("lisense")
         assert result == "license"
@@ -26,7 +28,6 @@ class TestCorrectQuery:
 
     def test_preserves_capitalization(self):
         result = correct_query("FastAPI setup")
-        # "FastAPI" starts with capital, correction should preserve case
         assert "FastAPI" in result
 
     def test_returns_empty_string_unchanged(self):
@@ -37,11 +38,9 @@ class TestCorrectQuery:
 
     def test_handles_punctuation(self):
         result = correct_query("learner's lisense")
-        # "learner's" — the apostrophe-s should be preserved
         assert "license" in result
         assert "'" in result
 
     def test_skips_short_words(self):
-        # Words under 3 chars are not corrected
         result = correct_query("a ok test")
         assert result == "a ok test"

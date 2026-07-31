@@ -39,6 +39,7 @@ class PDFParser(BaseParser):
                 "Missing dependency: install 'pypdf'",
             ) from exc
 
+        # Read the PDF from bytes using pypdf.
         try:
             reader = PdfReader(stream=BytesIO(body))
         except Exception as exc:
@@ -47,7 +48,7 @@ class PDFParser(BaseParser):
         if reader.pages is None or len(reader.pages) == 0:
             raise ParserError(fetch_result.content_type, "PDF has no pages")
 
-        # Extract text from each page
+        # Extract text from each page, tolerating per-page failures.
         pages_text: list[str] = []
         for i, page in enumerate(reader.pages):
             try:
@@ -62,7 +63,7 @@ class PDFParser(BaseParser):
         if not content:
             raise ParserError(fetch_result.content_type, "No extractable text content found in PDF")
 
-        # Extract title from PDF metadata or fall back to the URL
+        # Extract title from PDF metadata or fall back to the URL.
         title = _extract_pdf_title(reader, url)
 
         num_pages = len(reader.pages)
@@ -87,7 +88,7 @@ class PDFParser(BaseParser):
 
 
 def _extract_pdf_title(reader, fallback_url: str) -> str:
-    """Extract the PDF document title from metadata."""
+    """Extract the PDF document title from metadata, falling back to the filename."""
     try:
         if reader.metadata and reader.metadata.title:
             title = reader.metadata.title.strip()
@@ -95,16 +96,15 @@ def _extract_pdf_title(reader, fallback_url: str) -> str:
                 return title
     except Exception:
         pass
-    # Fall back to the last segment of the URL
+    # Fall back to the last segment of the URL (the filename).
     import urllib.parse
     path = urllib.parse.urlparse(fallback_url).path
     filename = path.rstrip("/").split("/")[-1] if path else ""
     if filename:
-        # Remove extension
         name, _ = filename.rsplit(".", 1) if "." in filename else (filename, None)
         return name.replace("-", " ").replace("_", " ").strip().title()
     return fallback_url
 
 
-# Auto-register
+# Auto-register this parser with the global parser registry.
 register_parser(PDFParser())

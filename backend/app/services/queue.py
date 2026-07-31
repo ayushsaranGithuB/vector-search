@@ -8,6 +8,8 @@ settings = get_settings()
 
 
 async def enqueue_ingestion_for_source(source_id: str) -> None:
+    """Publish a source ID to the ingestion queue for async processing."""
+    # Connect to RabbitMQ and publish a message with the source ID.
     connection = await aio_pika.connect_robust(settings.cloudamqp_url)
     async with connection:
         channel = await connection.channel()

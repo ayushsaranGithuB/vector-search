@@ -32,10 +32,12 @@ logger.add(
 
 
 def _now() -> str:
+    """Return the current UTC timestamp as an ISO 8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def _write(event: str, payload: dict[str, Any]) -> None:
+    """Write an analytics event to the JSONL log file."""
     try:
         logger.bind(analytics=True).info(
             event,
@@ -58,6 +60,7 @@ class QueryLogger:
         latency_ms: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
+        """Record a search query event with timing and metadata."""
         _write(
             "SEARCH",
             {
@@ -82,6 +85,7 @@ class QueryLogger:
         latency_ms: int | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
+        """Record an LLM call event with token usage and cost."""
         _write(
             "LLM_CALL",
             {
@@ -105,6 +109,7 @@ class QueryLogger:
         query: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
+        """Record an error event for observability."""
         _write(
             "ERROR",
             {
@@ -125,6 +130,7 @@ async def timed_search(project_id: str | None, query: str | None):
     try:
         yield source_ids
     finally:
+        # On exit, compute elapsed time and persist the log.
         latency_ms = int((time.perf_counter() - start) * 1000)
         await QueryLogger.log_search(
             project_id=project_id,
@@ -144,8 +150,9 @@ async def timed_llm_call(
     start = time.perf_counter()
     info: dict[str, Any] = {}
     try:
-        yield info
+        yield info  # Caller populates info dict with token/cost data.
     finally:
+        # On exit, compute latency and persist the log entry.
         latency_ms = int((time.perf_counter() - start) * 1000)
         await QueryLogger.log_llm(
             project_id=project_id,

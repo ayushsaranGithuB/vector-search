@@ -7,6 +7,7 @@ from app.api.routes.sources import router as sources_router
 from app.api.routes.fetch_title import router as fetch_title_router
 from app.api.routes.logs import router as logs_router
 
+# Root API router that aggregates all route modules under their respective tags.
 api_router = APIRouter()
 api_router.include_router(health_router, tags=["system"])
 api_router.include_router(projects_router, tags=["projects"])

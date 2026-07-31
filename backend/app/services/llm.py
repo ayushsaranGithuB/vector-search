@@ -43,6 +43,7 @@ MODEL_REGISTRY: dict[str, dict[str, str]] = {
 
 
 def openrouter_available() -> bool:
+    """Check if OpenRouter API key is configured."""
     return bool(settings.openrouter_api_key)
 
 
@@ -54,6 +55,7 @@ def list_models() -> list[dict[str, str]]:
     ]
 
 
+# System prompt instructing the LLM how to format grounded answers with citations.
 SYSTEM_PROMPT = """
 You are a precise research assistant. Your job is to answer the user's question using ONLY the provided search results.
 
@@ -81,7 +83,7 @@ def build_context(results: list[dict[str, Any]]) -> str:
     Groups chunks by source so each unique source gets one citation number,
     preventing the LLM from treating every chunk as a distinct source.
     """
-    # Group results by source name
+    # Group results by source name, merging excerpts per source.
     from collections import OrderedDict
 
     grouped: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -97,6 +99,7 @@ def build_context(results: list[dict[str, Any]]) -> str:
             }
         grouped[source]["excerpts"].append(result.get("excerpt", ""))
 
+    # Format as a numbered list of sources for the LLM prompt.
     parts = []
     for i, (source_name, entry) in enumerate(grouped.items(), start=1):
         merged_content = "\n\n".join(entry["excerpts"])
@@ -111,6 +114,7 @@ def build_context(results: list[dict[str, Any]]) -> str:
 
 
 def _build_messages(query: str, context: str) -> list[dict[str, str]]:
+    """Build the system + user message array for the LLM chat completion."""
     user_prompt = f"""## User Question
 
 {query}
@@ -140,20 +144,17 @@ Example: "According to the Motor Vehicles Act 1989, heavy vehicles are defined a
     ]
 
 
-def _estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float | None:
-    """Return estimated USD cost for a given OpenRouter model and token counts.
+# Hard-coded pricing for common OpenRouter models (per 1M tokens).
+_PRICING: dict[str, tuple[float, float]] = {
+    "qwen/qwen3.7-flash": (0.03, 0.13),
+}
 
-    Pricing is best-effort; unknown models return None. OpenRouter provides
-    per-model pricing via /api/v1/models, but hard-coding common models avoids
-    an extra network call on every completion.
-    """
-    # Prices are per 1M tokens (input / output).
-    pricing: dict[str, tuple[float, float]] = {
-        "qwen/qwen3.7-flash": (0.03, 0.13),
-    }
-    if model_id not in pricing:
+
+def _estimate_cost(model_id: str, input_tokens: int, output_tokens: int) -> float | None:
+    """Return estimated USD cost for a given OpenRouter model and token counts."""
+    if model_id not in _PRICING:
         return None
-    in_price, out_price = pricing[model_id]
+    in_price, out_price = _PRICING[model_id]
     return (input_tokens * in_price + output_tokens * out_price) / 1_000_000
 
 
@@ -162,7 +163,7 @@ async def _call_openrouter(
     messages: list[dict[str, str]],
     llm_info: dict[str, Any] | None = None,
 ) -> str | None:
-    """Make a single OpenRouter chat completion call."""
+    """Make a single OpenRouter chat completion call and return the response text."""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -170,7 +171,7 @@ async def _call_openrouter(
                 headers={
                     "Authorization": f"Bearer {settings.openrouter_api_key}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://vector-search.local",  # OpenRouter requires this
+                    "HTTP-Referer": "https://vector-search.local",  # OpenRouter requires this.
                 },
                 json={
                     "model": model_id,
@@ -182,6 +183,7 @@ async def _call_openrouter(
             response.raise_for_status()
             data = response.json()
             content = data["choices"][0]["message"]["content"]
+            # Extract token usage and populate llm_info for logging.
             usage = data.get("usage", {})
             input_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
             output_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
@@ -192,9 +194,7 @@ async def _call_openrouter(
                     llm_info["cost_usd"] = _estimate_cost(model_id, input_tokens, output_tokens)
             logger.info(
                 "OpenRouter %s — %d input results, %d output tokens",
-                model_id,
-                len(messages),
-                output_tokens if output_tokens is not None else "?",
+                model_id, len(messages), output_tokens if output_tokens is not None else "?",
             )
             return content.strip()
 

@@ -21,6 +21,7 @@ async def _db_keepalive():
         try:
             await prisma.execute_raw("SELECT 1")
         except Exception:
+            # On failure, attempt a full reconnect and continue retrying.
             logger.warning("DB keepalive failed, attempting reconnect...", exc_info=True)
             try:
                 await prisma.disconnect()
@@ -28,11 +29,10 @@ async def _db_keepalive():
                 logger.info("DB reconnected successfully")
             except Exception as reconnect_error:
                 logger.error("DB reconnect failed: %s", reconnect_error)
-                # Don't break — keep retrying on next cycle
 
 
 async def main() -> None:
-    # Ensure stdout is line-buffered even when piped (e.g. under goreman)
+    # Ensure stdout is line-buffered even when piped (e.g. under goreman).
     sys.stdout.reconfigure(line_buffering=True)
 
     logger.info("=" * 60)
@@ -41,6 +41,7 @@ async def main() -> None:
     await prisma.connect()
     logger.info("Connected to database")
 
+    # Start DB keepalive and enter the ingestion message loop.
     keepalive = asyncio.create_task(_db_keepalive())
 
     try:

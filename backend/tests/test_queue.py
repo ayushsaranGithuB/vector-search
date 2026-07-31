@@ -1,9 +1,11 @@
+# Tests for the ingestion queue: message publishing with mocked RabbitMQ.
 import pytest
 
 from app.services.queue import enqueue_ingestion_for_source
 
 
 class FakeExchange:
+    """Mock aio_pika exchange that counts published messages."""
     def __init__(self, published):
         self.published = published
 
@@ -12,6 +14,7 @@ class FakeExchange:
 
 
 class FakeChannel:
+    """Mock aio_pika channel that returns a fake exchange."""
     def __init__(self, published):
         self.published = published
 
@@ -20,6 +23,7 @@ class FakeChannel:
 
 
 class FakeConnection:
+    """Mock aio_pika connection that returns a fake channel."""
     def __init__(self, published):
         self.published = published
 
@@ -35,6 +39,7 @@ class FakeConnection:
 
 @pytest.mark.asyncio
 async def test_enqueue_ingestion_for_source(monkeypatch):
+    """Verify that enqueuing a source ID publishes exactly one message."""
     published = {"count": 0}
 
     async def fake_connect(url):

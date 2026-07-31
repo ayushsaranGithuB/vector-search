@@ -17,7 +17,7 @@ if not logger.handlers:
 
 router = APIRouter(prefix="/fetch-title", tags=["fetch-title"])
 
-
+# Regex to extract the <title> tag content from raw HTML bytes.
 TITLE_RE = re.compile(rb"<title[^>]*>(.*?)</title>", re.IGNORECASE)
 
 
@@ -37,23 +37,22 @@ async def fetch_title(url: str = Query(..., description="The URL to fetch the ti
             })
             response.raise_for_status()
 
-            # Only try to extract title from HTML responses
+            # Only try to extract title from HTML responses.
             content_type = response.headers.get("content-type", "")
             if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
                 return {"title": None}
 
+            # Extract the title tag content from raw bytes.
             match = TITLE_RE.search(response.content)
             if match:
                 raw = match.group(1).strip()
-                # Decode with the response encoding, fall back to utf-8
                 try:
                     encoding = response.encoding or "utf-8"
                     title = raw.decode(encoding).strip()
                 except (LookupError, UnicodeDecodeError):
                     title = raw.decode("utf-8", errors="replace").strip()
-                # Clean up whitespace
+                # Clean up whitespace and truncate very long titles.
                 title = re.sub(r"\s+", " ", title)
-                # Truncate overly long titles
                 if len(title) > 200:
                     title = title[:200] + "…"
                 return {"title": title if title else None}

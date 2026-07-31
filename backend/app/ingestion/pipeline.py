@@ -88,7 +88,7 @@ async def run_pipeline(
     """
     outcome = PipelineOutcome(success=True)
 
-    # ── Step 1: Fetch ──────────────────────────────────────────────────
+    # ── Step 1: Fetch the URL ─────────────────────────────────────────
     fetch_result: FetchResult | None = None
     try:
         fetch_result = await fetch_url(
@@ -107,7 +107,7 @@ async def run_pipeline(
     except Exception as exc:
         return _fail(outcome, "fetch", f"Unexpected fetch error: {exc}", "unexpected")
 
-    # ── Step 2: Parse ──────────────────────────────────────────────────
+    # ── Step 2: Parse the fetched content ─────────────────────────────
     parser = get_parser_for_content_type(fetch_result.content_type)
     if parser is None:
         return _fail(
@@ -125,7 +125,7 @@ async def run_pipeline(
     except Exception as exc:
         return _fail(outcome, "parse", f"Unexpected parse error: {exc}", "unexpected")
 
-    # ── Step 3: Normalize ──────────────────────────────────────────────
+    # ── Step 3: Normalize the parsed document ─────────────────────────
     try:
         document = normalize_document(document)
     except Exception as exc:
@@ -134,7 +134,7 @@ async def run_pipeline(
     if not document.content.strip():
         return _fail(outcome, "normalize", "Document is empty after normalization", "empty_content")
 
-    # ── Step 4: Chunk ──────────────────────────────────────────────────
+    # ── Step 4: Chunk the normalized content ───────────────────────────
     try:
         chunks = chunk_document(document, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     except Exception as exc:
@@ -159,7 +159,7 @@ async def run_pipeline(
 
 
 def _fail(outcome: PipelineOutcome, step: str, message: str, error_type: str) -> PipelineOutcome:
-    """Record a failure and return the outcome."""
+    """Record a pipeline step failure and return the outcome with error details."""
     outcome.success = False
     outcome.errors.append(PipelineError(step=step, message=message, error_type=error_type))
     logger.warning("Pipeline step '%s' failed: %s", step, message)

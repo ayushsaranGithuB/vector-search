@@ -48,7 +48,7 @@ def chunk_document(
     if not text:
         return []
 
-    # Split into paragraphs first
+    # Split into paragraphs first, preserving paragraph boundaries for splitting.
     paragraphs = text.split("\n\n")
     paragraphs = [p.strip() for p in paragraphs if p.strip()]
 
@@ -60,36 +60,34 @@ def chunk_document(
     current_chunk = ""
 
     for para in paragraphs:
-        # If adding this paragraph doesn't exceed the limit, append it
+        # If adding this paragraph doesn't exceed the limit, append it.
         if not current_chunk:
             current_chunk = para
         elif len(current_chunk) + len(para) + 2 <= chunk_size:
             current_chunk += "\n\n" + para
         else:
-            # Current chunk is full; save it and start a new one
+            # Current chunk is full; save it and start a new one with overlap.
             chunks.append(current_chunk.strip())
 
-            # Apply overlap: take the last `chunk_overlap` chars from the current chunk
             if chunk_overlap > 0 and len(current_chunk) > chunk_overlap:
                 overlap_text = _find_paragraph_boundary(current_chunk, chunk_overlap)
                 current_chunk = overlap_text + "\n\n" + para
             else:
                 current_chunk = para
 
-    # Don't forget the last chunk
+    # Don't forget the last chunk.
     if current_chunk.strip():
         chunks.append(current_chunk.strip())
 
-    # If paragraphs are too long, fall back to exact character splitting
+    # If any chunk still exceeds the limit, split it by exact character positions.
     final_chunks: list[str] = []
     for chunk in chunks:
         if len(chunk) > chunk_size:
-            # Split this oversized chunk further
             final_chunks.extend(_split_by_chars(chunk, chunk_size, chunk_overlap))
         else:
             final_chunks.append(chunk)
 
-    # Build ChunkResult objects
+    # Build ChunkResult objects with token counts.
     tokenizer = tokenizer or (lambda s: len(s.split()))
     results: list[ChunkResult] = []
     for index, content in enumerate(final_chunks):
@@ -122,22 +120,22 @@ def _find_paragraph_boundary(text: str, target_chars: int) -> str:
 
     start = len(text) - target_chars
 
-    # Try to find a paragraph boundary after the start point
+    # Try to find a paragraph boundary after the start point.
     para_boundary = text.find("\n\n", start)
     if para_boundary != -1 and para_boundary < len(text) - 1:
         return text[para_boundary + 2 :]
 
-    # Try to find a sentence boundary
+    # Try to find a sentence boundary.
     sentence_boundary = text.find(". ", start)
     if sentence_boundary != -1 and sentence_boundary < len(text) - 1:
         return text[sentence_boundary + 2 :]
 
-    # Fall back to exact character position
+    # Fall back to exact character position.
     return text[start:]
 
 
 def _split_by_chars(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
-    """Fallback: split text by exact character positions."""
+    """Fallback: split text by exact character positions with sliding window."""
     chunks: list[str] = []
     start = 0
     while start < len(text):

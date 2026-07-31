@@ -20,6 +20,7 @@ async def _db_keepalive():
         try:
             await prisma.execute_raw("SELECT 1")
         except Exception:
+            # On failure, attempt a full reconnect and continue retrying.
             logger.warning("DB keepalive failed, attempting reconnect...", exc_info=True)
             try:
                 await prisma.disconnect()
@@ -27,20 +28,22 @@ async def _db_keepalive():
                 logger.info("DB reconnected successfully")
             except Exception as reconnect_error:
                 logger.error("DB reconnect failed: %s", reconnect_error)
-                # Don't break — keep retrying on next cycle
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Connect to Prisma on startup and start the keepalive background task.
     await prisma.connect()
     keepalive = asyncio.create_task(_db_keepalive())
     try:
         yield
     finally:
+        # Clean up on shutdown: cancel keepalive and disconnect from DB.
         keepalive.cancel()
         await prisma.disconnect()
 
 
+# Create the FastAPI application with CORS and all route modules.
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",

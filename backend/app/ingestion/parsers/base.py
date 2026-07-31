@@ -61,8 +61,5 @@ def register_parser(parser: BaseParser) -> None:
 
 
 def get_parser_for_content_type(content_type: str) -> BaseParser | None:
-    """Look up a parser by MIME type.
-
-    Returns ``None`` if no parser is registered for the given type.
-    """
+    """Look up a parser by MIME type. Returns None if no parser is registered."""
     return _parser_registry.get(content_type)
