@@ -1,10 +1,11 @@
 import logging
 import sys
 
+from app.core.config import get_settings
 from app.db import prisma
 from app.services.pinecone import delete_vectors_for_source
+from app.services.queue import enqueue_ingestion_for_source
 from app.services.storage import build_r2_object_key, get_r2_client
-from app.core.config import get_settings
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -14,6 +15,53 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False
+
+
+async def resync_source(source_id: str) -> None:
+    """Re-sync a source: delete existing vectors/chunks and re-ingest the data.
+
+    Only PROCESSED or FAILED sources can be re-synced. Sources that are QUEUED
+    or already PROCESSING will raise a ValueError.
+    """
+    source = await prisma.source.find_unique(
+        where={"id": source_id},
+        include={"project": True},
+    )
+    if source is None:
+        raise ValueError("Source not found")
+
+    if source.status not in ("PROCESSED", "FAILED"):
+        raise ValueError(
+            f"Cannot resync source with status '{source.status}' — "
+            "only PROCESSED or FAILED sources can be re-synced"
+        )
+
+    logger.info(
+        "Re-syncing source %s ('%s', current status='%s')",
+        source_id, source.name, source.status,
+    )
+
+    # 1. Delete existing Pinecone vectors.
+    await delete_vectors_for_source(source_id)
+
+    # 2. Delete existing DB chunks and ingestion runs.
+    await prisma.chunk.delete_many(where={"source_id": source_id})
+    await prisma.ingestionrun.delete_many(where={"source_id": source_id})
+
+    # 3. Reset source status to QUEUED and clear sync metadata.
+    await prisma.source.update(
+        where={"id": source_id},
+        data={
+            "status": "QUEUED",
+            "chunk_count": None,
+            "last_synced_at": None,
+        },
+    )
+    logger.info("Source %s reset to QUEUED, enqueuing for re-ingestion", source_id)
+
+    # 4. Enqueue for re-ingestion.
+    await enqueue_ingestion_for_source(source_id)
+    logger.info("Source %s enqueued for re-ingestion", source_id)
 
 
 async def delete_source(source_id: str) -> None:

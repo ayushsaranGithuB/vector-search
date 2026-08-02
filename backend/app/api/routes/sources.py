@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.services.sources import cancel_source, delete_source
+from app.services.sources import cancel_source, delete_source, resync_source
 
 router = APIRouter(prefix="/sources")
 
@@ -20,5 +20,19 @@ async def cancel_source_route(source_id: str):
     try:
         await cancel_source(source_id)
         return {"status": "cancelled"}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/{source_id}/resync", status_code=status.HTTP_200_OK)
+async def resync_source_route(source_id: str):
+    """Re-sync a source: delete existing vectors/chunks and re-ingest the data.
+
+    Only PROCESSED or FAILED sources can be re-synced. The source will be reset
+    to QUEUED status and enqueued for re-ingestion.
+    """
+    try:
+        await resync_source(source_id)
+        return {"status": "queued", "message": "Source will be re-ingested shortly"}
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
