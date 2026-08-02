@@ -8,4 +8,4 @@
 - [x] Query analytics and observability dashboard
 - [x] Route Cohere through the OpenRouter endpoint
 - [x] Populate `pinecone_vector_id` on chunks after upsert
-- [ ] Wire up "Sync Sources" button in admin panel
+- [x] Wire up "Sync Sources" button in admin panel

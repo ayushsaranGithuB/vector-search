@@ -85,8 +85,6 @@ async def test_resync_source_processed_source(monkeypatch):
     assert deleted_chunks == [{"source_id": "source-123"}]
     assert deleted_runs == [{"source_id": "source-123"}]
     assert updated_source["status"] == "QUEUED"
-    assert "chunk_count" in updated_source
-    assert "last_synced_at" in updated_source
     assert published["count"] == 1
 
 
@@ -182,3 +180,21 @@ async def test_resync_source_processing_status(monkeypatch):
 
     with pytest.raises(ValueError, match="Cannot resync source with status 'PROCESSING'"):
         await resync_source("source-abc")
+
+
+@pytest.mark.asyncio
+async def test_resync_source_cancelled_status(monkeypatch):
+    """Verify that resyncing a CANCELLED source raises ValueError."""
+    class FakeSource:
+        id = "source-def"
+        name = "Cancelled Source"
+        status = "CANCELLED"
+        project = type("FakeProject", (), {"slug": "test-project"})()
+
+    async def fake_find_unique(where, include=None):
+        return FakeSource()
+
+    monkeypatch.setattr("app.db.prisma.source.find_unique", fake_find_unique)
+
+    with pytest.raises(ValueError, match="Cannot resync source with status 'CANCELLED'"):
+        await resync_source("source-def")

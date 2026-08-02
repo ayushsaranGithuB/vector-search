@@ -184,7 +184,7 @@ Project and source API endpoints — list projects, get project details, list so
 
 ### `app/api/routes/sources.py`
 
-Source management endpoints — delete and cancel sources (cascades to Pinecone vectors, R2 objects, and DB).
+Source management endpoints — delete, cancel, and re-sync sources (cascades to Pinecone vectors, R2 objects, and DB).
 
 ### `app/api/routes/uploads.py`
 
@@ -247,7 +247,7 @@ Project and source data access — CRUD, search with Pinecone vector + PostgreSQ
 
 ### `app/services/sources.py`
 
-Source lifecycle management — delete (cascades Pinecone → R2 → DB), cancel (QUEUED/PROCESSING → CANCELLED).
+Source lifecycle management — delete (cascades Pinecone → R2 → DB), cancel (QUEUED/PROCESSING → CANCELLED), resync (re-chunk and re-ingest PROCESSED/FAILED sources).
 
 ### `app/db.py`
 
