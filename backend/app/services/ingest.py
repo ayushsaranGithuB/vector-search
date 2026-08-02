@@ -222,16 +222,20 @@ async def ingest_source(source_id: str) -> None:
 
         keepalive_task.cancel()
         # Mark the source as processed with updated metadata.
+        # Only update size_bytes for URL sources; for PDFs, preserve the original file size from R2.
+        update_data = {
+            "status": "PROCESSED",
+            "chunk_count": len(chunks),
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+            "last_synced_at": datetime.utcnow(),
+        }
+        if source.source_type == "URL":
+            update_data["size_bytes"] = len(text.encode("utf-8"))
+
         await prisma.source.update(
             where={"id": source.id},
-            data={
-                "status": "PROCESSED",
-                "chunk_count": len(chunks),
-                "chunk_size": 1000,
-                "chunk_overlap": 200,
-                "last_synced_at": datetime.utcnow(),
-                "size_bytes": len(text.encode("utf-8")),
-            },
+            data=update_data,
         )
         await prisma.ingestionrun.update_many(
             where={"source_id": source.id, "status": "RUNNING"},
