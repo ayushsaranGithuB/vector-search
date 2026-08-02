@@ -332,6 +332,35 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     );
   }
 
+  function getChunkSize(source: ProjectSource) {
+    if (source.chunks === 0) return 0;
+    // Determine unit MB/KB/B via regex on size string
+    const unitMatch = source.size.match(/(\d+(?:\.\d+)?)\s*(\w+)/);
+    const sizeValue = unitMatch ? parseFloat(unitMatch[1]) : 0;
+    const unit = unitMatch ? unitMatch[2] : "B";
+
+    // Get Float Value of Size
+    let sizeInBytes = 0;
+    if (unit === "B") {
+      sizeInBytes = sizeValue;
+    } else if (unit === "KB") {
+      sizeInBytes = sizeValue * 1024;
+    } else if (unit === "MB") {
+      sizeInBytes = sizeValue * 1024 * 1024;
+    }
+
+    // Divide by Chunks to get Average Size per Chunk
+    const averageSize = sizeInBytes / source.chunks;
+
+    //  Return Average Size per Chunk with Unit
+    if (averageSize >= 1024 * 1024) {
+      return `${(averageSize / (1024 * 1024)).toFixed(2)} MB`;
+    } else if (averageSize >= 1024) {
+      return `${(averageSize / 1024).toFixed(2)} KB`;
+    }
+    return `${averageSize.toFixed(0)} Bytes`;
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
       <div className="flex flex-col gap-4 border-b border-border pb-8 lg:flex-row lg:items-end lg:justify-between">
@@ -500,24 +529,23 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 ">
           <div className="overflow-hidden rounded-lg border border-border/60">
             <div className="grid grid-cols-8 gap-4 border-b border-border bg-muted/40 px-4 py-3 text-sm font-medium">
-              <span className="col-span-2">Source</span>
+              <span className="col-span-3">Source</span>
               <span>Type</span>
               <span>Status</span>
               <span>Added</span>
               <span>Size</span>
-              <span>Chunks</span>
               <span>Actions</span>
             </div>
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border ">
               {sources.map((source) => (
                 <div
                   key={source.id}
-                  className="grid grid-cols-8 gap-4 px-4 py-4 text-sm items-center"
+                  className="grid grid-cols-8 gap-4 px-4 py-4 text-sm items-center bg-white"
                 >
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <p className="font-medium">{source.name}</p>
                     <p className="text-muted-foreground truncate flex items-center gap-1">
                       {source.type === "pdf" ? (
@@ -542,9 +570,16 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                     </Badge>
                   </div>
                   <div className="text-muted-foreground">{source.addedAt}</div>
-                  <div className="text-muted-foreground">{source.size}</div>
-                  <div className="text-muted-foreground">{source.chunks}</div>
-                  <div className="flex gap-2">
+                  <div className="text-muted-foreground">
+                    <p className="text-neutral-600 font-bold">{source.size}</p>
+                    <p className="text-neutral-500 text-xs">
+                      {source.chunks} Chunks
+                    </p>
+                    <p className="text-neutral-400 text-xs">
+                      ~{getChunkSize(source)} each
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
                     {(source.status === "queued" ||
                       source.status === "processing") && (
                       <Button
@@ -568,6 +603,7 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                         size="xs"
                         disabled={actionLoading === source.id}
                         onClick={() => handleResync(source.id, source.name)}
+                        className=" py-4"
                       >
                         {actionLoading === source.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
