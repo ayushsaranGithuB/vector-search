@@ -48,13 +48,11 @@ async def resync_source(source_id: str) -> None:
     await prisma.chunk.delete_many(where={"source_id": source_id})
     await prisma.ingestionrun.delete_many(where={"source_id": source_id})
 
-    # 3. Reset source status to QUEUED and clear sync metadata.
+    # 3. Reset source status to QUEUED.
     await prisma.source.update(
         where={"id": source_id},
         data={
             "status": "QUEUED",
-            "chunk_count": None,
-            "last_synced_at": None,
         },
     )
     logger.info("Source %s reset to QUEUED, enqueuing for re-ingestion", source_id)
