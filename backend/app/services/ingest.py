@@ -85,7 +85,6 @@ async def ingest_source(source_id: str) -> None:
     # Clean slate: delete old Pinecone vectors first, then DB records.
     existing_chunks = await prisma.chunk.find_many(
         where={"source_id": source.id},
-        select={"pinecone_vector_id": True},
     )
     old_vector_ids = [
         c.pinecone_vector_id for c in existing_chunks if c.pinecone_vector_id
