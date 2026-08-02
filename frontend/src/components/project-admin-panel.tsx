@@ -116,6 +116,36 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
     setActionLoading(null);
   }
 
+  async function handleResync(sourceId: string, sourceName: string) {
+    if (
+      !confirm(
+        `Re-sync "${sourceName}"? This will delete existing vectors and re-ingest the data.`,
+      )
+    )
+      return;
+
+    setActionLoading(sourceId);
+
+    const response = await fetch(`${backendUrl}/sources/${sourceId}/resync`, {
+      method: "POST",
+    });
+
+    if (response.ok) {
+      setSources((current) =>
+        current.map((s) =>
+          s.id === sourceId ? { ...s, status: "queued" as const } : s,
+        ),
+      );
+      toast.success(`"${sourceName}" queued for re-sync.`);
+    } else {
+      const error = await response.text();
+      toast.error(`Failed to re-sync "${sourceName}"`, {
+        description: error,
+      });
+    }
+    setActionLoading(null);
+  }
+
   // Poll for source status updates while any source is in a non-terminal state
   const hasActiveSources = sources.some(
     (s) => s.status === "queued" || s.status === "processing",
@@ -529,6 +559,22 @@ export function ProjectAdminPanel({ project }: ProjectAdminPanelProps) {
                           <XCircle className="h-3.5 w-3.5" />
                         )}
                         <span className="ml-1.5">Cancel</span>
+                      </Button>
+                    )}
+                    {(source.status === "processed" ||
+                      source.status === "failed") && (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        disabled={actionLoading === source.id}
+                        onClick={() => handleResync(source.id, source.name)}
+                      >
+                        {actionLoading === source.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                        <span className="ml-1.5">Re-sync</span>
                       </Button>
                     )}
                     <Button
